@@ -40,8 +40,8 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 **Phase A — Ship-ready**
 - [x] A1 Console script `psyker` in pyproject.toml
 - [x] A2 CLI command `sandbox reset` [--logs]
-- [ ] A3 Verify LSP diagnostics include hint
-- [ ] A4 Full test suite + Grammar Context pass
+- [x] A3 Verify LSP diagnostics include hint
+- [x] A4 Full test suite + Grammar Context pass
 
 **Phase B — IDE experience**
 - [x] B1 LSP completions: keywords per dialect
@@ -59,5 +59,13 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 
 
 - [x] Step 5 executor implemented and verified (run_task + ExecutionResult + executor tests).
+
+## UI/UX Plan (see md contexts/CODEX_UI_UX_PLAN.md)
+
+- [x] Phase 1: welcome banner before REPL prompt
+- [x] Phase 2: colorized help/usage in TTY only
+- [x] Phase 3: extended help options (--cmds, --version, --about, per-command help)
+- [x] Phase 4: VS Code icon theme wired with logo asset
+- [ ] Phase 5: executable packaging (deferred)
 
 

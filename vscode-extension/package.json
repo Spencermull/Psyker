@@ -75,6 +75,13 @@
         "scopeName": "source.psyw",
         "path": "./syntax/psyw.tmLanguage.json"
       }
+    ],
+    "iconThemes": [
+      {
+        "id": "psyker-icons",
+        "label": "Psyker Icons",
+        "path": "./icon-themes/psyker-icons.json"
+      }
     ]
   }
 }

@@ -1,0 +1,24 @@
+{
+  "iconDefinitions": {
+    "_psyker": {
+      "iconPath": "../icons/logo_icon.png"
+    },
+    "_file": {
+      "iconPath": "../icons/logo_icon.png"
+    },
+    "_folder": {
+      "iconPath": "../icons/logo_icon.png"
+    },
+    "_folderExpanded": {
+      "iconPath": "../icons/logo_icon.png"
+    }
+  },
+  "fileExtensions": {
+    "psy": "_psyker",
+    "psya": "_psyker",
+    "psyw": "_psyker"
+  },
+  "file": "_file",
+  "folder": "_folder",
+  "folderExpanded": "_folderExpanded"
+}
