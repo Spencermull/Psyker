@@ -100,7 +100,7 @@ async function runTaskCommand(debugMode) {
   const taskPath = editor.document.uri.fsPath;
 
   terminal.show(true);
-  terminal.sendText(cliPath);
+  terminal.sendText(normalizeCliCommand(cliPath));
   for (const workerFile of workerFiles) {
     terminal.sendText(`load "${escapeForPsykerCli(workerFile.fsPath)}"`);
   }
@@ -290,6 +290,13 @@ function extractTaskBlocks(text) {
 
 function escapeForPsykerCli(value) {
   return value.replace(/"/g, '\\"');
+}
+
+function normalizeCliCommand(value) {
+  if (/\s/.test(value) && !value.startsWith("\"")) {
+    return `"${value}"`;
+  }
+  return value;
 }
 
 module.exports = {
