@@ -1,0 +1,83 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Psyker Task",
+  "scopeName": "source.psy",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#identifiers"
+    },
+    {
+      "name": "punctuation.separator.psy",
+      "match": "[\\{\\}\\[\\]:,;=]"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.psy",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.psy",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.psy",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.psy",
+          "match": "\\b(task|agents|workers)\\b"
+        },
+        {
+          "name": "keyword.other.directive.psy",
+          "match": "@access\\b"
+        },
+        {
+          "name": "support.function.psy",
+          "match": "\\b(fs\\.open|fs\\.create|exec\\.ps|exec\\.cmd)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.integer.psy",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.identifier.psy",
+          "match": "\\b[A-Za-z][A-Za-z0-9_-]*\\b"
+        }
+      ]
+    }
+  }
+}

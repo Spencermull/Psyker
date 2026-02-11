@@ -1,0 +1,72 @@
+{
+  "name": "psyker-vscode",
+  "displayName": "Psyker",
+  "description": "Syntax support for Psyker DSL files.",
+  "version": "0.0.1",
+  "publisher": "psyker",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:psy",
+    "onLanguage:psya",
+    "onLanguage:psyw"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "psy",
+        "aliases": [
+          "Psyker Task",
+          "psy"
+        ],
+        "extensions": [
+          ".psy"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "psya",
+        "aliases": [
+          "Psyker Agent",
+          "psya"
+        ],
+        "extensions": [
+          ".psya"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "psyw",
+        "aliases": [
+          "Psyker Worker",
+          "psyw"
+        ],
+        "extensions": [
+          ".psyw"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "psy",
+        "scopeName": "source.psy",
+        "path": "./syntax/psy.tmLanguage.json"
+      },
+      {
+        "language": "psya",
+        "scopeName": "source.psya",
+        "path": "./syntax/psya.tmLanguage.json"
+      },
+      {
+        "language": "psyw",
+        "scopeName": "source.psyw",
+        "path": "./syntax/psyw.tmLanguage.json"
+      }
+    ]
+  }
+}
