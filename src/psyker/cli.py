@@ -28,9 +28,30 @@ from .sandbox import Sandbox
 CommandHandler = Callable[[list[str]], int]
 WELCOME_LINE = f"Psyker v{__version__} - DSL runtime for terminal automation"
 WELCOME_BYLINE = "By Spencer Muller"
+METRO_HEX_EYE_ASCII = (
+    "                     #########################",
+    "                ######                   ######",
+    "             #####      #############      #####",
+    "           ####      ####         ####      ####",
+    "         ####      ###   ### ###   ###      ####",
+    "        ###      ###   ##       ##   ###      ###",
+    "       ###      ###   ##   ###   ##   ###      ###",
+    "       ###      ###   ##  ## ##  ##   ###      ###",
+    "       ###      ###   ##   ###   ##   ###      ###",
+    "        ###      ###   ##       ##   ###      ###",
+    "         ####      ###   #######   ###      ####",
+    "           ####      ####       ####      ####",
+    "             #####      #########      #####",
+    "                ######           ######",
+    "                     #########################",
+)
 ANSI_RESET = "\033[0m"
 ANSI_BLUE = "\033[34m"
 ANSI_RED = "\033[31m"
+ANSI_BRIGHT_BLUE = "\033[94m"
+ANSI_CYAN = "\033[96m"
+ANSI_BOLD = "\033[1m"
+ANSI_DIM = "\033[2m"
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 FLAG_PATTERN = re.compile(r"--[a-zA-Z0-9-]+")
 PROMPT_TEXT = "PSYKER> "
@@ -106,9 +127,7 @@ class PsykerCLI:
         self._register_commands()
 
     def run_repl(self) -> int:
-        self._println(self._color_banner_line(WELCOME_LINE))
-        self._println(WELCOME_BYLINE)
-        self._println("")
+        self._print_startup_banner()
 
         use_prompt_toolkit = (
             _pt_prompt is not None
@@ -414,6 +433,25 @@ class PsykerCLI:
             raise PsykerError("Usage: exit")
         return 0
 
+    def _print_startup_banner(self) -> None:
+        self._println(self._color_banner_line(WELCOME_LINE, color=ANSI_BRIGHT_BLUE, bold=True))
+        self._println(self._color_banner_line(WELCOME_BYLINE, color=ANSI_CYAN))
+
+        if self._colors_enabled():
+            self._println(self._color_banner_line("[metro] bundling psychic shell...", color=ANSI_BLUE, dim=True))
+            self._println(self._color_banner_line("[metro] calibrating hex-eye matrix...", color=ANSI_BLUE, dim=True))
+
+        tones = (ANSI_BRIGHT_BLUE, ANSI_BLUE, ANSI_CYAN, ANSI_BLUE, ANSI_BRIGHT_BLUE)
+        center_line = len(METRO_HEX_EYE_ASCII) // 2
+        for idx, line in enumerate(METRO_HEX_EYE_ASCII):
+            tone = tones[idx % len(tones)]
+            emph = idx in {0, center_line, len(METRO_HEX_EYE_ASCII) - 1}
+            self._println(self._color_banner_line(line, color=tone, bold=emph))
+
+        if self._colors_enabled():
+            self._println(self._color_banner_line("[metro] psychic mesh online", color=ANSI_CYAN, dim=True))
+        self._println("")
+
     def _println(self, text: str) -> None:
         self.out.write(text + "\n")
         self.out.flush()
@@ -438,10 +476,16 @@ class PsykerCLI:
             return text
         return FLAG_PATTERN.sub(lambda m: f"{ANSI_RED}{m.group(0)}{ANSI_RESET}", text)
 
-    def _color_banner_line(self, text: str) -> str:
+    def _color_banner_line(self, text: str, color: str = ANSI_BLUE, bold: bool = False, dim: bool = False) -> str:
         if not self._colors_enabled():
             return text
-        return f"{ANSI_BLUE}{text}{ANSI_RESET}"
+        prefix = ""
+        if dim:
+            prefix += ANSI_DIM
+        if bold:
+            prefix += ANSI_BOLD
+        prefix += color
+        return f"{prefix}{text}{ANSI_RESET}"
 
 
 def map_error_to_exit_code(exc: Exception) -> int:
