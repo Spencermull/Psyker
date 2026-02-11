@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from psyker.errors import SandboxError
-from psyker.sandbox import Sandbox
+from psyker.sandbox import Sandbox, default_sandbox_root
 
 
 class SandboxTests(unittest.TestCase):
@@ -41,6 +44,15 @@ class SandboxTests(unittest.TestCase):
         content = self.sandbox.log_file.read_text(encoding="utf-8")
         self.assertIn("agent=alpha", content)
         self.assertIn("worker=w1", content)
+
+    def test_default_sandbox_root_uses_home_not_pyinstaller_temp(self) -> None:
+        home = Path(self.tempdir.name) / "home"
+        home.mkdir(parents=True, exist_ok=True)
+        with patch.dict(os.environ, {}, clear=True):
+            with patch.object(Path, "home", return_value=home):
+                with patch.object(sys, "_MEIPASS", str(Path(self.tempdir.name) / "bundle"), create=True):
+                    root = default_sandbox_root()
+        self.assertEqual(root, (home / "psyker_sandbox").resolve())
 
 
 if __name__ == "__main__":

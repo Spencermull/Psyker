@@ -176,9 +176,12 @@ def parse_text(path: Path, text: str) -> object:
 
 def to_lsp_diagnostic(exc: PsykerError, default_path: Path) -> Diagnostic:
     span = exc.span or SourceSpan(default_path, 1, 1)
+    if span.path is None:
+        span = SourceSpan(default_path, span.line, span.column)
     line = max(span.line - 1, 0)
     col = max(span.column - 1, 0)
-    message = exc.to_diagnostic()
+    normalized_error = type(exc)(exc.message, span=span, hint=exc.hint)
+    message = normalized_error.to_diagnostic()
     return Diagnostic(
         range=Range(
             start=Position(line=line, character=col),

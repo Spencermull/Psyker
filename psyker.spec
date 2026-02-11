@@ -3,7 +3,12 @@
 from pathlib import Path
 
 
-project_root = Path(__file__).resolve().parent
+try:
+    project_root = Path(__file__).resolve().parent
+except NameError:
+    # When the spec is executed in an environment where __file__ is not set,
+    # fall back to the current working directory (expected to be repo root).
+    project_root = Path.cwd()
 icon_path = project_root / "vscode-extension" / "icons" / "logo_icon.ico"
 if not icon_path.exists():
     icon_path = project_root / "icons" / "logo_icon.ico"
@@ -16,7 +21,7 @@ for source, target in [("Grammar Context", "Grammar Context"), ("md contexts", "
 
 
 a = Analysis(
-    ["src/psyker/__main__.py"],
+    ["psyker_frozen_entry.py"],
     pathex=[str(project_root / "src")],
     binaries=[],
     datas=datas,
