@@ -44,10 +44,10 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 - [ ] A4 Full test suite + Grammar Context pass
 
 **Phase B — IDE experience**
-- [ ] B1 LSP completions: keywords per dialect
-- [ ] B2 LSP completions: worker names in .psya
-- [ ] B3 LSP hover: keywords/capabilities help
-- [ ] B4 Root README (install, quick start, run, testing, editor)
+- [x] B1 LSP completions: keywords per dialect
+- [x] B2 LSP completions: worker names in .psya
+- [x] B3 LSP hover: keywords/capabilities help
+- [x] B4 Root README (install, quick start, run, testing, editor)
 
 **Phase C — Polish (optional)**
 - [ ] C1 VS Code command "Psyker: Run task"
