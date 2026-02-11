@@ -10,6 +10,12 @@ This document governs how AI assistance is used to develop PSYKER v0.1. It enfor
 - Codex (terminal): code generation for small, isolated patches (parser, validator, CLI wiring, tests).
 - No autonomous agents. Human-in-the-loop for all merges.
 
+## Autonomous Development (minimal engagement)
+- **Codex** follows `md contexts/AUTONOMOUS_DEV_PLAN.md` step-by-step; uses all md contexts as spec; commits per step and updates `TODO.md`.
+- **Cursor** reviews when user posts "Codex did step N" or pastes diff; checks against specs, suggests tests or fixes; does not take over implementation unless asked.
+- **Task tracker:** repo root `TODO.md` lists Phase 1 steps; Codex checks off on completion; Cursor can add review/test tasks.
+- Human still approves merges and dependency changes.
+
 ---
 
 ## Hard Constraints (v0.1)

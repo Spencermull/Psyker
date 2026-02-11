@@ -112,4 +112,6 @@ When starting a phase, Codex can say: “Starting Phase 1, step 1 (Lexer).” Cu
 
 ---
 
+**Autonomous execution:** For step-by-step implementation with minimal prompts, use **AUTONOMOUS_DEV_PLAN.md** (same phases, with per-step specs, done-when criteria, and Cursor review triggers). Update **TODO.md** at repo root as you complete each step.
+
 *This file is the handoff for Codex and the coordination point for Cursor when executing phases.*
