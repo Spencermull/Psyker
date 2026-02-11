@@ -2,7 +2,7 @@
   "name": "psyker-vscode",
   "displayName": "Psyker",
   "description": "Syntax highlighting and LSP diagnostics for Psyker DSL files.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "psyker",
   "main": "./client/extension.js",
   "engines": {
@@ -38,6 +38,10 @@
         "extensions": [
           ".psy"
         ],
+        "icon": {
+          "light": "./icons/logo_icon.png",
+          "dark": "./icons/logo_icon.png"
+        },
         "configuration": "./language-configuration.json"
       },
       {
@@ -49,6 +53,10 @@
         "extensions": [
           ".psya"
         ],
+        "icon": {
+          "light": "./icons/logo_icon.png",
+          "dark": "./icons/logo_icon.png"
+        },
         "configuration": "./language-configuration.json"
       },
       {
@@ -60,6 +68,10 @@
         "extensions": [
           ".psyw"
         ],
+        "icon": {
+          "light": "./icons/logo_icon.png",
+          "dark": "./icons/logo_icon.png"
+        },
         "configuration": "./language-configuration.json"
       }
     ],
@@ -92,13 +104,6 @@
       {
         "language": "psyw",
         "path": "./snippets/psyw.code-snippets"
-      }
-    ],
-    "iconThemes": [
-      {
-        "id": "psyker-icons",
-        "label": "Psyker Icons",
-        "path": "./icon-themes/psyker-icons.json"
       }
     ],
     "commands": [

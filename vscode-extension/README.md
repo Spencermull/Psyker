@@ -45,12 +45,7 @@ After install, VS Code auto-detects:
 - `*.psya` as `psya`
 - `*.psyw` as `psyw`
 
-To enable Psyker file icons:
-1. `Ctrl+Shift+P`
-2. `File Icon Theme`
-3. `Psyker Icons`
-
-With that icon theme active, Psyker files use the Psyker logo in Explorer.
+Psyker file types use the Psyker logo as their language icon in Explorer without requiring a custom file icon theme.
 
 ## Editing Experience
 
@@ -138,7 +133,7 @@ With `task_basic.psy`, `agent_basic.psya`, and `worker_basic.psyw` in a workspac
 
 ### Psyker icons do not appear
 
-- Activate `Psyker Icons` via `File Icon Theme`.
+- Try a different file icon theme; some third-party themes disable language-mode fallback icons.
 
 ### `Psyker: Run task` or `Debug task` fails
 

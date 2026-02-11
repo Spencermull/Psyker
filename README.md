@@ -32,7 +32,7 @@ Then in VS Code:
 
 After install:
 1. Open any `*.psy`, `*.psya`, or `*.psyw` file.
-2. Optional icon theme: `Ctrl+Shift+P` -> `File Icon Theme` -> `Psyker Icons`.
+2. Psyker file types use the Psyker logo as their language icon in Explorer.
 3. Run `Psyker: Run task` from Command Palette to execute the task under your cursor.
 
 LSP diagnostics require Python + Psyker runtime on your machine:
