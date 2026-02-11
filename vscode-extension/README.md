@@ -1,62 +1,50 @@
 # Psyker VS Code Extension
 
-This extension provides:
+Psyker language support for:
+- `.psy` task files (`psy`)
+- `.psya` agent files (`psya`)
+- `.psyw` worker files (`psyw`)
 
-- `.psy` (tasks)
-- `.psya` (agents)
-- `.psyw` (workers)
+## Install via VSIX (recommended)
 
-## How to run / install the extension
+From the repo root:
 
-### Option A: Run from workspace (recommended for development)
+```bash
+cd vscode-extension
+npm install
+vsce package
+```
 
-1. **Install Node dependencies** (once):
-   ```bash
-   cd vscode-extension
-   npm install
-   cd ..
-   ```
+This creates:
 
-2. **Open the Psyker repo** in VS Code (File → Open Folder → select the `Psyker` folder, not `vscode-extension`).
+```text
+vscode-extension/psyker-vscode-<version>.vsix
+```
 
-3. **Install Python LSP deps** (once) so diagnostics work:
-   ```bash
-   pip install -r requirements-lsp.txt
-   ```
+Install it in VS Code:
+1. Open Extensions (`Ctrl+Shift+X`).
+2. Click `...` in the Extensions view.
+3. Select `Install from VSIX...`.
+4. Pick `psyker-vscode-<version>.vsix`.
 
-4. **Launch the extension:** Press **F5** or go to Run and Debug (Ctrl+Shift+D), choose **"Launch Psyker Extension"**, then Run. A new VS Code window opens with the extension loaded.
+No extension development host is required.
 
-5. In the new window, open any `.psy`, `.psya`, or `.psyw` file (e.g. from `Grammar Context/valid` or `invalid`) to see syntax highlighting and LSP diagnostics.
+## Language Identity and Icons
 
-### Option B: Install as a .vsix (optional)
+After install:
+- `*.psy`, `*.psya`, and `*.psyw` are auto-detected with Psyker language IDs.
+- Syntax highlighting activates immediately.
+- To show Psyker file icons, run:
+  `Ctrl+Shift+P` -> `File Icon Theme` -> `Psyker Icons`.
 
-1. Install the VS Code extension packaging tool: `npm install -g @vscode/vsce`
-2. In the repo: `cd vscode-extension`, run `npm install`, then `vsce package`.
-3. In VS Code: Extensions view (Ctrl+Shift+X) → "..." menu → **Install from VSIX...** → select the generated `.vsix` file.
+## Runtime Prerequisites (for diagnostics/completions)
 
-**Note:** The LSP server runs `python -m psyker_lsp` with `PYTHONPATH` set to the repo `src` folder. For Option B, the extension still expects to be run from the repo layout (or you’d need to change how the server is started). Option A is the most reliable for this repo.
+The extension starts the Python LSP server with `python -m psyker_lsp`.
+Install runtime dependencies on the machine where VS Code runs:
 
----
+```bash
+pip install -e .
+pip install -r requirements-lsp.txt
+```
 
-## Syntax Highlighting (Phase 2a)
-
-The extension registers language IDs `psy`, `psya`, and `psyw`, and applies TextMate grammars for:
-
-- comments (`# ...`)
-- strings (`"..."` with escapes)
-- reserved keywords per dialect
-
-## LSP Diagnostics (Phase 2b)
-
-The extension launches a Python language server (`python -m psyker_lsp`) and reports parser diagnostics on open/change for Psyker files.
-
-Supported diagnostics:
-
-- `SyntaxError`
-- `DialectError`
-- optional `ReferenceError` for agent-to-worker references across currently open documents
-
-## Dependency Approval Note
-
-Phase 2b requires the Python dependency `pygls` (and `lsprotocol`).
-Per `md contexts/AGENTS.md`, this dependency addition requires human approval before installation/use in shared environments.
+If Python/Psyker is not installed, syntax highlighting still works but language-server features will be unavailable.

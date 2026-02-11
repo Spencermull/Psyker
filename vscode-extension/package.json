@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "vscode:prepublish": "echo \"No build step configured\"",
-    "lint": "echo \"No lint configured\""
+    "lint": "echo \"No lint configured\"",
+    "package:vsix": "vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"

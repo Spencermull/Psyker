@@ -12,6 +12,35 @@ pip install -e .
 pip install -r requirements-lsp.txt
 ```
 
+## VS Code (Install via VSIX)
+
+Install the Psyker VS Code extension without dev-host mode:
+
+```bash
+cd vscode-extension
+npm install
+vsce package
+```
+
+That creates `psyker-vscode-<version>.vsix` in `vscode-extension/`.
+
+Then in VS Code:
+1. Open Extensions (`Ctrl+Shift+X`).
+2. Click `...` (top-right).
+3. Select `Install from VSIX...`.
+4. Pick `psyker-vscode-<version>.vsix`.
+
+After install:
+1. Open any `*.psy`, `*.psya`, or `*.psyw` file.
+2. Optional icon theme: `Ctrl+Shift+P` -> `File Icon Theme` -> `Psyker Icons`.
+
+LSP diagnostics require Python + Psyker runtime on your machine:
+
+```bash
+pip install -e .
+pip install -r requirements-lsp.txt
+```
+
 ### Optional (but recommended): live typing colors in the REPL
 
 Psyker supports **live highlighting while you type** (commands in blue, `--flags` in red) when `prompt_toolkit` is available.
@@ -78,4 +107,4 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 
 ## VS Code Extension
 
-See `vscode-extension/INSTALL.md`.
+See `vscode-extension/README.md`.
