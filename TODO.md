@@ -10,7 +10,7 @@ Codex marks steps complete when done. Cursor may add review or test tasks. Human
 - [x] **Step 2** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AST + parsers (three dialects, Grammar Context valid/invalid)
 - [x] **Step 3** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Validator + load pipeline (registries, no partial updates on error)
 - [x] **Step 4** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Sandbox (root, layout, path validation, logs)
-- [ ] **Step 5** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Executor (run flow, fs.*/exec.*, capabilities, sandbox cwd)
+- [x] **Step 5** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Executor (run flow, fs.*/exec.*, capabilities, sandbox cwd)
 - [ ] **Step 6** ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â CLI (ls, stx, load, run, open/mkfile/mkdir/ps/cmd, exit codes)
 
 ---
@@ -29,3 +29,5 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`
 
 
 
+
+- [x] Step 5 executor implemented and verified (run_task + ExecutionResult + executor tests).
