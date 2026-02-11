@@ -114,7 +114,12 @@ class PsykerCLI:
             "sandbox reset [--logs|--clear-logs]",
             "Reset sandbox workspace/tmp (optionally logs).",
         )
-        self._register("help", self._cmd_help, "help [command]", "Show command help.")
+        self._register(
+            "help",
+            self._cmd_help,
+            "help [--cmds|--version|--about|<command>]",
+            "Show command help and Psyker metadata.",
+        )
         self._register("exit", self._cmd_exit, "exit", "Exit the REPL.")
         self._register("quit", self._cmd_exit, "quit", "Exit the REPL.")
 
@@ -277,8 +282,22 @@ class PsykerCLI:
 
     def _cmd_help(self, args: list[str]) -> int:
         if len(args) > 1:
-            raise PsykerError("Usage: help [command]")
+            raise PsykerError("Usage: help [--cmds|--version|--about|<command>]")
+        if len(args) == 1 and args[0] == "--cmds":
+            names = [self._color_command(name) for name in sorted(self.commands)]
+            self._println("\n".join(names))
+            return 0
+        if len(args) == 1 and args[0] == "--version":
+            self._println(f"Psyker v{__version__}")
+            return 0
+        if len(args) == 1 and args[0] == "--about":
+            self._println(f"{WELCOME_LINE}\n{WELCOME_BYLINE}")
+            return 0
         if len(args) == 1:
+            if args[0].startswith("--"):
+                raise PsykerError(
+                    f"Unknown help option '{args[0]}'. Use: help [--cmds|--version|--about|<command>]"
+                )
             command = self.commands.get(args[0])
             if command is None:
                 raise PsykerError(f"Unknown command '{args[0]}'")

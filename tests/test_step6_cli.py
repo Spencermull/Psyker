@@ -126,6 +126,27 @@ class CLITests(unittest.TestCase):
         self.assertIn("\x1b[34mload\x1b[0m", output)
         self.assertIn("\x1b[31m--output\x1b[0m", output)
 
+    def test_help_cmds_lists_commands(self) -> None:
+        self.assertEqual(self.cli.execute_line("help --cmds"), 0)
+        output = self.out.getvalue()
+        self.assertIn("load", output)
+        self.assertIn("run", output)
+        self.assertIn("help", output)
+
+    def test_help_version(self) -> None:
+        self.assertEqual(self.cli.execute_line("help --version"), 0)
+        self.assertIn("Psyker v0.1.0", self.out.getvalue())
+
+    def test_help_about(self) -> None:
+        self.assertEqual(self.cli.execute_line("help --about"), 0)
+        output = self.out.getvalue()
+        self.assertIn("Psyker v0.1.0 — DSL runtime for terminal automation", output)
+        self.assertIn("By Spencer Muller", output)
+
+    def test_help_unknown_option_is_clear_error(self) -> None:
+        self.assertEqual(self.cli.execute_line("help --bad"), 1)
+        self.assertIn("Unknown help option '--bad'", self.err.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
