@@ -77,6 +77,20 @@
         "path": "./syntax/psyw.tmLanguage.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "psy",
+        "path": "./snippets/psy.code-snippets"
+      },
+      {
+        "language": "psya",
+        "path": "./snippets/psya.code-snippets"
+      },
+      {
+        "language": "psyw",
+        "path": "./snippets/psyw.code-snippets"
+      }
+    ],
     "iconThemes": [
       {
         "id": "psyker-icons",

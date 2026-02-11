@@ -1,0 +1,15 @@
+{
+  "Psyker Worker Basic": {
+    "prefix": "psyker-worker-basic",
+    "description": "Creates a .psyw worker skeleton with sandbox/cwd and explicit allow capabilities so runtime permissions are clear and spec-compliant.",
+    "body": [
+      "worker ${1:w1} {",
+      "  sandbox ${2:./sandbox};",
+      "  cwd ${3:./sandbox/workspace};",
+      "  allow ${4:fs.open};",
+      "  allow ${5:fs.create};",
+      "  allow ${6:exec.ps};",
+      "}"
+    ]
+  }
+}

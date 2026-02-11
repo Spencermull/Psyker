@@ -1,0 +1,12 @@
+{
+  "Psyker Task Basic": {
+    "prefix": "psyker-task-basic",
+    "description": "Creates a spec-aligned .psy task skeleton with @access and one statement. Starts from deny-all semantics until you add allowed agents/workers.",
+    "body": [
+      "@access { agents: [${1:alpha}], workers: [${2:w1}] }",
+      "task ${3:task_name} {",
+      "  ${4:fs.open \\\"sandbox/input.txt\\\";}",
+      "}"
+    ]
+  }
+}

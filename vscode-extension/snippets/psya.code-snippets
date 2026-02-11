@@ -1,0 +1,11 @@
+{
+  "Psyker Agent Basic": {
+    "prefix": "psyker-agent-basic",
+    "description": "Creates a .psya agent skeleton that binds workers with `use worker <name> count = <int>;` as defined in PSYKER_GRAMMAR.md.",
+    "body": [
+      "agent ${1:alpha} {",
+      "  use worker ${2:w1} count = ${3:1};",
+      "}"
+    ]
+  }
+}
