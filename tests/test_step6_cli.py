@@ -81,6 +81,32 @@ class CLITests(unittest.TestCase):
             mocked.return_value.stderr = "bad"
             self.assertEqual(self.cli.execute_line('cmd "echo hi"'), 5)
 
+    def test_sandbox_reset_preserves_or_clears_logs(self) -> None:
+        workspace_file = self.sandbox.resolve_in_workspace("logs/out.txt")
+        workspace_file.parent.mkdir(parents=True, exist_ok=True)
+        workspace_file.write_text("utility", encoding="utf-8")
+
+        tmp_file = self.sandbox.tmp / "tmp.txt"
+        tmp_file.write_text("tmp", encoding="utf-8")
+        self.sandbox.log("alpha", "w1", "fs.open", "ok")
+        self.assertTrue(self.sandbox.log_file.exists())
+
+        self.assertEqual(self.cli.execute_line("sandbox reset"), 0)
+        self.assertFalse(workspace_file.exists())
+        self.assertFalse(tmp_file.exists())
+        self.assertTrue(self.sandbox.log_file.exists())
+
+        workspace_file = self.sandbox.resolve_in_workspace("logs/out2.txt")
+        workspace_file.parent.mkdir(parents=True, exist_ok=True)
+        workspace_file.write_text("utility2", encoding="utf-8")
+        tmp_file = self.sandbox.tmp / "tmp2.txt"
+        tmp_file.write_text("tmp2", encoding="utf-8")
+
+        self.assertEqual(self.cli.execute_line("sandbox reset --logs"), 0)
+        self.assertFalse(workspace_file.exists())
+        self.assertFalse(tmp_file.exists())
+        self.assertFalse(self.sandbox.log_file.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

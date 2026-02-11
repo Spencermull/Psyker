@@ -97,6 +97,12 @@ class PsykerCLI:
         self._register("mkdir", self._cmd_mkdir, "mkdir <path>", "Create a directory in sandbox workspace.")
         self._register("ps", self._cmd_ps, 'ps "<powershell command>"', "Run a PowerShell command in sandbox workspace.")
         self._register("cmd", self._cmd_cmd, 'cmd "<cmd command>"', "Run a cmd command in sandbox workspace.")
+        self._register(
+            "sandbox",
+            self._cmd_sandbox,
+            "sandbox reset [--logs|--clear-logs]",
+            "Reset sandbox workspace/tmp (optionally logs).",
+        )
         self._register("help", self._cmd_help, "help [command]", "Show command help.")
         self._register("exit", self._cmd_exit, "exit", "Exit the REPL.")
         self._register("quit", self._cmd_exit, "quit", "Exit the REPL.")
@@ -225,6 +231,23 @@ class PsykerCLI:
         if len(args) != 1:
             raise PsykerError('Usage: cmd "<cmd command>"')
         return self._run_cli_exec(["cmd", "/c", args[0]])
+
+    def _cmd_sandbox(self, args: list[str]) -> int:
+        if not args or args[0] != "reset":
+            raise PsykerError("Usage: sandbox reset [--logs|--clear-logs]")
+        clear_logs = False
+        if len(args) == 2:
+            if args[1] not in {"--logs", "--clear-logs"}:
+                raise PsykerError("Usage: sandbox reset [--logs|--clear-logs]")
+            clear_logs = True
+        elif len(args) > 2:
+            raise PsykerError("Usage: sandbox reset [--logs|--clear-logs]")
+        self.runtime.sandbox.reset(clear_logs=clear_logs)
+        if clear_logs:
+            self._println("sandbox reset: workspace, tmp, and logs cleared")
+        else:
+            self._println("sandbox reset: workspace and tmp cleared")
+        return 0
 
     def _run_cli_exec(self, command: list[str]) -> int:
         cwd = self.runtime.sandbox.workspace
