@@ -16,6 +16,7 @@ build/
 # IDE / editor
 .idea/
 .vscode/
+node_modules/
 *.swp
 *.swo
 
