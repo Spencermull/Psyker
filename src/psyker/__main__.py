@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from .cli import create_default_cli
+from .entry import run
 
 
 def main() -> int:
-    cli = create_default_cli()
-    return cli.run_repl()
+    return run()
 
 
 if __name__ == "__main__":
