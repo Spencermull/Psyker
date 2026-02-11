@@ -1,4 +1,4 @@
-﻿# PSYKER ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Phase 1 Task Tracker
+# PSYKER ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Phase 1 Task Tracker
 
 Codex marks steps complete when done. Cursor may add review or test tasks. Human approves merges.
 
@@ -32,6 +32,27 @@ Codex marks steps complete when done. Cursor may add review or test tasks. Human
 - [x] **Phase 2b** â€” LSP (Python server reusing psyker parser, diagnostics)
 
 Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
+
+---
+
+## v0.1 Readiness (see md contexts/V01_READINESS_PLAN.md)
+
+**Phase A — Ship-ready**
+- [ ] A1 Console script `psyker` in pyproject.toml
+- [ ] A2 CLI command `sandbox reset` [--logs]
+- [ ] A3 Verify LSP diagnostics include hint
+- [ ] A4 Full test suite + Grammar Context pass
+
+**Phase B — IDE experience**
+- [ ] B1 LSP completions: keywords per dialect
+- [ ] B2 LSP completions: worker names in .psya
+- [ ] B3 LSP hover: keywords/capabilities help
+- [ ] B4 Root README (install, quick start, run, testing, editor)
+
+**Phase C — Polish (optional)**
+- [ ] C1 VS Code command "Psyker: Run task"
+- [ ] C2 Completions for task names (optional)
+- [ ] C3 CI job for test suite
 
 
 
