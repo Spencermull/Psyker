@@ -72,9 +72,9 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 
 - [x] Phase 2: clean entry layer for executable target
 - [x] Phase 3: PyInstaller packaging strategy
-- [ ] Phase 4: sandbox/path behavior for packaged EXE
-- [ ] Phase 5: blue matrix themed terminal via prompt_toolkit
-- [ ] Phase 6: testing and verification
-- [ ] Phase 7: docs and distribution notes
+- [x] Phase 4: sandbox/path behavior for packaged EXE
+- [x] Phase 5: blue matrix themed terminal via prompt_toolkit
+- [x] Phase 6: testing and verification
+- [x] Phase 7: docs and distribution notes
 
 

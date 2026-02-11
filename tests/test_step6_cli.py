@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from psyker.cli import PsykerCLI
+from psyker.cli import PROMPT_TEXT, PsykerCLI
 from psyker.runtime import RuntimeState
 from psyker.sandbox import Sandbox
 
@@ -112,7 +112,7 @@ class CLITests(unittest.TestCase):
             code = self.cli.run_repl()
         self.assertEqual(code, 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.0 — DSL runtime for terminal automation", output)
+        self.assertIn("Psyker v0.1.0 - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
 
     def test_help_uses_no_color_when_not_tty(self) -> None:
@@ -120,11 +120,21 @@ class CLITests(unittest.TestCase):
         self.assertNotIn("\x1b[", self.out.getvalue())
 
     def test_help_colorizes_commands_and_flags_when_tty(self) -> None:
-        with patch("sys.stdout.isatty", return_value=True):
-            self.assertEqual(self.cli.execute_line("help"), 0)
-        output = self.out.getvalue()
+        class _TTYStringIO(io.StringIO):
+            def isatty(self) -> bool:  # pragma: no cover - behavior exercised via CLI
+                return True
+
+        tty_out = _TTYStringIO()
+        cli = PsykerCLI(self.runtime, out=tty_out, err=self.err)
+        self.assertEqual(cli.execute_line("help"), 0)
+        output = tty_out.getvalue()
         self.assertIn("\x1b[34mload\x1b[0m", output)
         self.assertIn("\x1b[31m--output\x1b[0m", output)
+
+    def test_help_does_not_use_color_for_non_tty_output_even_if_stdout_is_tty(self) -> None:
+        with patch("sys.stdout.isatty", return_value=True):
+            self.assertEqual(self.cli.execute_line("help"), 0)
+        self.assertNotIn("\x1b[", self.out.getvalue())
 
     def test_help_cmds_lists_commands(self) -> None:
         self.assertEqual(self.cli.execute_line("help --cmds"), 0)
@@ -140,12 +150,67 @@ class CLITests(unittest.TestCase):
     def test_help_about(self) -> None:
         self.assertEqual(self.cli.execute_line("help --about"), 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.0 — DSL runtime for terminal automation", output)
+        self.assertIn("Psyker v0.1.0 - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
 
     def test_help_unknown_option_is_clear_error(self) -> None:
         self.assertEqual(self.cli.execute_line("help --bad"), 1)
         self.assertIn("Unknown help option '--bad'", self.err.getvalue())
+
+    def test_run_repl_uses_prompt_toolkit_theme_when_tty(self) -> None:
+        cli = PsykerCLI(self.runtime)
+
+        class _FakeStyle:
+            captured: dict[str, str] | None = None
+
+            @staticmethod
+            def from_dict(style_dict: dict[str, str]) -> str:
+                _FakeStyle.captured = style_dict
+                return "style-object"
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("sys.stdout.isatty", return_value=True):
+                with patch("psyker.cli._pt_Style", new=_FakeStyle):
+                    with patch("psyker.cli._pt_prompt", side_effect=EOFError) as mocked_prompt:
+                        code = cli.run_repl()
+
+        self.assertEqual(code, 0)
+        self.assertEqual(mocked_prompt.call_args.args[0], [("class:prompt", PROMPT_TEXT)])
+        self.assertEqual(mocked_prompt.call_args.kwargs["style"], "style-object")
+        self.assertIn("lexer", mocked_prompt.call_args.kwargs)
+        self.assertEqual(mocked_prompt.call_args.kwargs["include_default_pygments_style"], False)
+        self.assertEqual(_FakeStyle.captured["prompt"], "ansibrightblue bold")
+        self.assertEqual(_FakeStyle.captured["command"], "ansibrightblue bold")
+        self.assertEqual(_FakeStyle.captured["flag"], "ansired bold")
+
+    def test_run_repl_falls_back_when_prompt_toolkit_is_unavailable(self) -> None:
+        cli = PsykerCLI(self.runtime)
+        with patch("psyker.cli._pt_prompt", new=None):
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("sys.stdout.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=EOFError) as mocked_input:
+                        code = cli.run_repl()
+        self.assertEqual(code, 0)
+        mocked_input.assert_called_once_with(PROMPT_TEXT)
+
+    def test_run_repl_falls_back_after_prompt_toolkit_error(self) -> None:
+        cli = PsykerCLI(self.runtime)
+
+        class _FakeStyle:
+            @staticmethod
+            def from_dict(style_dict: dict[str, str]) -> str:
+                return "style-object"
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("sys.stdout.isatty", return_value=True):
+                with patch("psyker.cli._pt_Style", new=_FakeStyle):
+                    with patch("psyker.cli._pt_prompt", side_effect=RuntimeError("prompt failed")) as mocked_prompt:
+                        with patch("builtins.input", side_effect=EOFError) as mocked_input:
+                            code = cli.run_repl()
+
+        self.assertEqual(code, 0)
+        mocked_prompt.assert_called_once()
+        mocked_input.assert_called_once_with(PROMPT_TEXT)
 
 
 if __name__ == "__main__":

@@ -26,13 +26,25 @@ from .sandbox import Sandbox
 
 
 CommandHandler = Callable[[list[str]], int]
-WELCOME_LINE = f"Psyker v{__version__} — DSL runtime for terminal automation"
+WELCOME_LINE = f"Psyker v{__version__} - DSL runtime for terminal automation"
 WELCOME_BYLINE = "By Spencer Muller"
 ANSI_RESET = "\033[0m"
 ANSI_BLUE = "\033[34m"
 ANSI_RED = "\033[31m"
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 FLAG_PATTERN = re.compile(r"--[a-zA-Z0-9-]+")
+PROMPT_TEXT = "PSYKER> "
+
+try:  # optional; enables live highlighting while typing
+    from prompt_toolkit import prompt as _pt_prompt
+    from prompt_toolkit.document import Document as _pt_Document
+    from prompt_toolkit.lexers import Lexer as _pt_Lexer
+    from prompt_toolkit.styles import Style as _pt_Style
+except Exception:  # pragma: no cover - optional dependency
+    _pt_prompt = None
+    _pt_Document = None
+    _pt_Lexer = None
+    _pt_Style = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +52,48 @@ class CommandDef:
     handler: CommandHandler
     usage: str
     description: str
+
+
+class _PsykerInputLexer:  # prompt_toolkit lexer (duck-typed)
+    def __init__(self, commands: set[str]) -> None:
+        self._commands = commands
+
+    def lex_document(self, document: "_pt_Document"):  # type: ignore[name-defined]
+        text = document.text
+
+        def get_line(_line_number: int) -> list[tuple[str, str]]:
+            if not text:
+                return []
+            parts: list[tuple[str, str]] = []
+
+            # First token (verb) in blue
+            m = re.match(r"^\s*(\S+)", text)
+            if m:
+                start, end = m.span(1)
+                prefix = text[:start]
+                verb = text[start:end]
+                rest = text[end:]
+                if prefix:
+                    parts.append(("", prefix))
+                style = "class:command" if verb in self._commands else ""
+                parts.append((style, verb))
+                text_to_scan = rest
+            else:
+                text_to_scan = text
+
+            # Flags (--) in red, everything else default.
+            idx = 0
+            for fm in FLAG_PATTERN.finditer(text_to_scan):
+                if fm.start() > idx:
+                    parts.append(("", text_to_scan[idx : fm.start()]))
+                parts.append(("class:flag", fm.group(0)))
+                idx = fm.end()
+            if idx < len(text_to_scan):
+                parts.append(("", text_to_scan[idx:]))
+
+            return parts
+
+        return get_line
 
 
 class PsykerCLI:
@@ -52,11 +106,51 @@ class PsykerCLI:
         self._register_commands()
 
     def run_repl(self) -> int:
-        self._println(WELCOME_LINE)
+        self._println(self._color_banner_line(WELCOME_LINE))
         self._println(WELCOME_BYLINE)
+        self._println("")
+
+        use_prompt_toolkit = (
+            _pt_prompt is not None
+            and _pt_Style is not None
+            and self.out is sys.stdout
+            and self.err is sys.stderr
+            and self._stream_is_tty(sys.stdin)
+            and self._stream_is_tty(sys.stdout)
+        )
+
+        pt_style = None
+        pt_lexer = None
+        pt_prompt: object = PROMPT_TEXT
+        if use_prompt_toolkit:
+            pt_style = _pt_Style.from_dict(
+                {
+                    "prompt": "ansibrightblue bold",
+                    "command": "ansibrightblue bold",
+                    "flag": "ansired bold",
+                    "": "#c7d5e0",
+                }
+            )
+            pt_lexer = _PsykerInputLexer(set(self.commands.keys()))
+            pt_prompt = [("class:prompt", PROMPT_TEXT)]
+
         while True:
             try:
-                line = input("psyker> ")
+                if use_prompt_toolkit:
+                    try:
+                        line = _pt_prompt(  # type: ignore[misc]
+                            pt_prompt,
+                            style=pt_style,
+                            lexer=pt_lexer,
+                            include_default_pygments_style=False,
+                        )
+                    except EOFError:
+                        raise
+                    except Exception:
+                        use_prompt_toolkit = False
+                        line = input(PROMPT_TEXT)
+                else:
+                    line = input(PROMPT_TEXT)
             except EOFError:
                 self._println("")
                 return self.last_exit_code
@@ -284,8 +378,11 @@ class PsykerCLI:
         if len(args) > 1:
             raise PsykerError("Usage: help [--cmds|--version|--about|<command>]")
         if len(args) == 1 and args[0] == "--cmds":
-            names = [self._color_command(name) for name in sorted(self.commands)]
-            self._println("\n".join(names))
+            rows = []
+            for name in sorted(self.commands):
+                command = self.commands[name]
+                rows.append([self._color_command(name), self._color_flags(command.usage), command.description])
+            self._println(_render_table(["command", "usage", "description"], rows))
             return 0
         if len(args) == 1 and args[0] == "--version":
             self._println(f"Psyker v{__version__}")
@@ -325,8 +422,11 @@ class PsykerCLI:
         self.err.write(text + "\n")
         self.err.flush()
 
+    def _stream_is_tty(self, stream: object) -> bool:
+        return bool(getattr(stream, "isatty", lambda: False)())
+
     def _colors_enabled(self) -> bool:
-        return bool(getattr(sys.stdout, "isatty", lambda: False)())
+        return self._stream_is_tty(self.out)
 
     def _color_command(self, text: str) -> str:
         if not self._colors_enabled():
@@ -337,6 +437,11 @@ class PsykerCLI:
         if not self._colors_enabled():
             return text
         return FLAG_PATTERN.sub(lambda m: f"{ANSI_RED}{m.group(0)}{ANSI_RESET}", text)
+
+    def _color_banner_line(self, text: str) -> str:
+        if not self._colors_enabled():
+            return text
+        return f"{ANSI_BLUE}{text}{ANSI_RESET}"
 
 
 def map_error_to_exit_code(exc: Exception) -> int:

@@ -12,6 +12,15 @@ pip install -e .
 pip install -r requirements-lsp.txt
 ```
 
+### Optional (but recommended): live typing colors in the REPL
+
+Psyker supports **live highlighting while you type** (commands in blue, `--flags` in red) when `prompt_toolkit` is available.
+It is included as a Psyker dependency via `pyproject.toml`, but if you need to install it manually:
+
+```bash
+python -m pip install prompt_toolkit
+```
+
 ## Run
 
 Start the CLI:
@@ -34,6 +43,32 @@ psyker> load "Grammar Context/valid/agent_basic.psya"
 psyker> load "Grammar Context/valid/task_basic.psy"
 psyker> run alpha hello
 ```
+
+## Psyker.exe (Themed Terminal)
+
+Build the Windows EXE from repo root with the existing PyInstaller spec:
+
+```bash
+python -m pip install -e ".[build]"
+pyinstaller psyker.spec
+```
+
+Build output (onedir):
+
+```text
+dist/Psyker/Psyker.exe
+```
+
+Run it from a terminal or by double-clicking `dist/Psyker/Psyker.exe`.
+The EXE launches the same sandbox-only REPL and keeps CLI behavior/exit codes aligned with `python -m psyker`.
+
+When `prompt_toolkit` is available in a TTY, the terminal uses a blue matrix look:
+- blue `PSYKER>` prompt and command verb highlighting
+- red `--flags`
+- dark-friendly input styling tuned for typical Windows terminals
+
+If themed input is unavailable, Psyker falls back to the plain REPL behavior.
+Sandbox root defaults to `%USERPROFILE%\\psyker_sandbox` and can be overridden with `PSYKER_SANDBOX_ROOT`.
 
 ## Test
 
