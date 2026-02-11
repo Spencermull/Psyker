@@ -107,6 +107,14 @@ class CLITests(unittest.TestCase):
         self.assertFalse(tmp_file.exists())
         self.assertFalse(self.sandbox.log_file.exists())
 
+    def test_run_repl_prints_welcome_banner(self) -> None:
+        with patch("builtins.input", side_effect=EOFError):
+            code = self.cli.run_repl()
+        self.assertEqual(code, 0)
+        output = self.out.getvalue()
+        self.assertIn("Psyker v0.1.0 — DSL runtime for terminal automation", output)
+        self.assertIn("By Spencer Muller", output)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ import subprocess
 import sys
 from typing import Callable, Dict, Iterable, TextIO
 
+from . import __version__
 from .errors import (
     AccessError,
     DialectError,
@@ -24,6 +25,8 @@ from .sandbox import Sandbox
 
 
 CommandHandler = Callable[[list[str]], int]
+WELCOME_LINE = f"Psyker v{__version__} — DSL runtime for terminal automation"
+WELCOME_BYLINE = "By Spencer Muller"
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,8 @@ class PsykerCLI:
         self._register_commands()
 
     def run_repl(self) -> int:
+        self._println(WELCOME_LINE)
+        self._println(WELCOME_BYLINE)
         while True:
             try:
                 line = input("psyker> ")
