@@ -29,7 +29,7 @@ Codex marks steps complete when done. Cursor may add review or test tasks. Human
 ## Phase 2 â€” VS Code extension + LSP
 
 - [x] **Phase 2a** â€” Syntax highlighting (extension, .psy/.psya/.psyw, TextMate grammars)
-- [ ] **Phase 2b** â€” LSP (Python server reusing psyker parser, diagnostics)
+- [x] **Phase 2b** â€” LSP (Python server reusing psyker parser, diagnostics)
 
 Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 

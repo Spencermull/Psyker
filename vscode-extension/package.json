@@ -1,9 +1,10 @@
 {
   "name": "psyker-vscode",
   "displayName": "Psyker",
-  "description": "Syntax support for Psyker DSL files.",
+  "description": "Syntax highlighting and LSP diagnostics for Psyker DSL files.",
   "version": "0.0.1",
   "publisher": "psyker",
+  "main": "./client/extension.js",
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -15,6 +16,13 @@
     "onLanguage:psya",
     "onLanguage:psyw"
   ],
+  "scripts": {
+    "vscode:prepublish": "echo \"No build step configured\"",
+    "lint": "echo \"No lint configured\""
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
   "contributes": {
     "languages": [
       {

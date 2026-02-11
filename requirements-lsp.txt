@@ -1,0 +1,4 @@
+# Phase 2b dependency set for Psyker LSP.
+# Requires human approval per md contexts/AGENTS.md before installation.
+pygls>=1.1.0
+lsprotocol>=2023.0.0
