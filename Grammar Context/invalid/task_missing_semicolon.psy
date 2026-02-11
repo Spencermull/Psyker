@@ -1,0 +1,4 @@
+@access { agents: [alpha], workers: [w1] }
+task bad {
+  fs.open "sandbox/input.txt"
+}

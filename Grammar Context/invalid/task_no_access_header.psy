@@ -1,0 +1,3 @@
+task noaccess {
+  fs.open "sandbox/input.txt";
+}

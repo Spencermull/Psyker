@@ -1,0 +1,4 @@
+agent beta {
+  use worker w1 count = 1;
+  use worker w2 count = 1;
+}

@@ -1,0 +1,6 @@
+worker w1 {
+  sandbox "sandbox";
+  cwd "sandbox/workspace";
+  allow fs.open;
+  allow exec.ps;
+}

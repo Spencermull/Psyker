@@ -1,0 +1,5 @@
+@access { agents: [alpha], workers: [w1] }
+task hello {
+  fs.open "sandbox/input.txt";
+  exec.ps "Write-Host 'ok'";
+}

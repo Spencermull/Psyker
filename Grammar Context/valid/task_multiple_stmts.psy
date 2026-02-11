@@ -1,0 +1,6 @@
+@access { agents: [alpha], workers: [w1] }
+task multi {
+  fs.create "sandbox/a.txt";
+  fs.open "sandbox/a.txt";
+  exec.cmd "echo hi";
+}

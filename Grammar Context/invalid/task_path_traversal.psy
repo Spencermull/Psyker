@@ -1,0 +1,4 @@
+@access { agents: [alpha], workers: [w1] }
+task escape {
+  fs.open "../secret.txt";
+}
