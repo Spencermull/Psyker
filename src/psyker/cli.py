@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,11 @@ from .sandbox import Sandbox
 CommandHandler = Callable[[list[str]], int]
 WELCOME_LINE = f"Psyker v{__version__} — DSL runtime for terminal automation"
 WELCOME_BYLINE = "By Spencer Muller"
+ANSI_RESET = "\033[0m"
+ANSI_BLUE = "\033[34m"
+ANSI_RED = "\033[31m"
+ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+FLAG_PATTERN = re.compile(r"--[a-zA-Z0-9-]+")
 
 
 @dataclass(frozen=True)
@@ -276,12 +282,14 @@ class PsykerCLI:
             command = self.commands.get(args[0])
             if command is None:
                 raise PsykerError(f"Unknown command '{args[0]}'")
-            self._println(f"{args[0]}: {command.description}\nusage: {command.usage}")
+            name = self._color_command(args[0])
+            usage = self._color_flags(command.usage)
+            self._println(f"{name}: {command.description}\nusage: {usage}")
             return 0
         rows = []
         for name in sorted(self.commands):
             command = self.commands[name]
-            rows.append([name, command.usage, command.description])
+            rows.append([self._color_command(name), self._color_flags(command.usage), command.description])
         self._println(_render_table(["command", "usage", "description"], rows))
         return 0
 
@@ -297,6 +305,19 @@ class PsykerCLI:
     def _eprintln(self, text: str) -> None:
         self.err.write(text + "\n")
         self.err.flush()
+
+    def _colors_enabled(self) -> bool:
+        return bool(getattr(sys.stdout, "isatty", lambda: False)())
+
+    def _color_command(self, text: str) -> str:
+        if not self._colors_enabled():
+            return text
+        return f"{ANSI_BLUE}{text}{ANSI_RESET}"
+
+    def _color_flags(self, text: str) -> str:
+        if not self._colors_enabled():
+            return text
+        return FLAG_PATTERN.sub(lambda m: f"{ANSI_RED}{m.group(0)}{ANSI_RESET}", text)
 
 
 def map_error_to_exit_code(exc: Exception) -> int:
@@ -320,14 +341,14 @@ def _render_table(headers: list[str], rows: Iterable[list[str]]) -> str:
     materialized = [list(row) for row in rows]
     if not materialized:
         return "(empty)"
-    widths = [len(h) for h in headers]
+    widths = [_visible_len(h) for h in headers]
     for row in materialized:
         for idx, value in enumerate(row):
-            widths[idx] = max(widths[idx], len(str(value)))
-    header = " | ".join(headers[idx].ljust(widths[idx]) for idx in range(len(headers)))
+            widths[idx] = max(widths[idx], _visible_len(str(value)))
+    header = " | ".join(_ljust_visible(headers[idx], widths[idx]) for idx in range(len(headers)))
     divider = "-+-".join("-" * widths[idx] for idx in range(len(headers)))
     body = "\n".join(
-        " | ".join(str(row[idx]).ljust(widths[idx]) for idx in range(len(headers)))
+        " | ".join(_ljust_visible(str(row[idx]), widths[idx]) for idx in range(len(headers)))
         for row in materialized
     )
     return f"{header}\n{divider}\n{body}"
@@ -339,3 +360,12 @@ def _format_value(value: object) -> str:
     if value is None:
         return "null"
     return str(value)
+
+
+def _visible_len(text: str) -> int:
+    return len(ANSI_PATTERN.sub("", text))
+
+
+def _ljust_visible(text: str, width: int) -> str:
+    pad = max(width - _visible_len(text), 0)
+    return text + (" " * pad)

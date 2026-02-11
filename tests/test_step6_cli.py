@@ -115,6 +115,17 @@ class CLITests(unittest.TestCase):
         self.assertIn("Psyker v0.1.0 — DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
 
+    def test_help_uses_no_color_when_not_tty(self) -> None:
+        self.assertEqual(self.cli.execute_line("help"), 0)
+        self.assertNotIn("\x1b[", self.out.getvalue())
+
+    def test_help_colorizes_commands_and_flags_when_tty(self) -> None:
+        with patch("sys.stdout.isatty", return_value=True):
+            self.assertEqual(self.cli.execute_line("help"), 0)
+        output = self.out.getvalue()
+        self.assertIn("\x1b[34mload\x1b[0m", output)
+        self.assertIn("\x1b[31m--output\x1b[0m", output)
+
 
 if __name__ == "__main__":
     unittest.main()
