@@ -83,7 +83,7 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 - [x] Phase 2: language identity and icon association
 - [x] Phase 3: deep editing UX (completions, hovers, snippets)
 - [x] Phase 4: navigation (definitions + document symbols)
-- [ ] Phase 5: run/debug from VS Code
+- [x] Phase 5: run/debug from VS Code
 - [ ] Phase 6: documentation polish
 
 

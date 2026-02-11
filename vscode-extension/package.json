@@ -14,7 +14,10 @@
   "activationEvents": [
     "onLanguage:psy",
     "onLanguage:psya",
-    "onLanguage:psyw"
+    "onLanguage:psyw",
+    "onCommand:psyker.runTask",
+    "onCommand:psyker.debugTask",
+    "onCommand:psyker.addDebugConfiguration"
   ],
   "scripts": {
     "vscode:prepublish": "echo \"No build step configured\"",
@@ -97,6 +100,40 @@
         "label": "Psyker Icons",
         "path": "./icon-themes/psyker-icons.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "psyker.runTask",
+        "title": "Psyker: Run task"
+      },
+      {
+        "command": "psyker.debugTask",
+        "title": "Psyker: Debug task"
+      },
+      {
+        "command": "psyker.addDebugConfiguration",
+        "title": "Psyker: Add Debug Launch Configuration"
+      }
+    ],
+    "configuration": {
+      "title": "Psyker",
+      "properties": {
+        "psyker.defaultAgent": {
+          "type": "string",
+          "default": "",
+          "description": "Default agent name used by Psyker: Run task and Psyker: Debug task."
+        },
+        "psyker.cliPath": {
+          "type": "string",
+          "default": "psyker",
+          "description": "Command used to launch the Psyker CLI in VS Code terminals."
+        },
+        "psyker.sandboxRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Optional value for PSYKER_SANDBOX_ROOT when running tasks from VS Code."
+        }
+      }
+    }
   }
 }
