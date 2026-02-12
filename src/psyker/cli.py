@@ -28,22 +28,12 @@ from .sandbox import Sandbox
 CommandHandler = Callable[[list[str]], int]
 WELCOME_LINE = f"Psyker v{__version__} - DSL runtime for terminal automation"
 WELCOME_BYLINE = "By Spencer Muller"
-METRO_HEX_EYE_ASCII = (
-    "                     #########################",
-    "                ######                   ######",
-    "             #####      #############      #####",
-    "           ####      ####         ####      ####",
-    "         ####      ###   ### ###   ###      ####",
-    "        ###      ###   ##       ##   ###      ###",
-    "       ###      ###   ##   ###   ##   ###      ###",
-    "       ###      ###   ##  ## ##  ##   ###      ###",
-    "       ###      ###   ##   ###   ##   ###      ###",
-    "        ###      ###   ##       ##   ###      ###",
-    "         ####      ###   #######   ###      ####",
-    "           ####      ####       ####      ####",
-    "             #####      #########      #####",
-    "                ######           ######",
-    "                     #########################",
+PSYKER_BANNER_ASCII = (
+    "   ____  _____ __  __ _____ ______ ",
+    "  / __ \\/ ___/\\ \\/ / / ___// ____/",
+    " / /_/ /\\__ \\  \\  /  \\__ \\/ __/   ",
+    "/ ____/___/ /  / /  ___/ / /___   ",
+    "/_/    /____/  /_/  /____/_____/  ",
 )
 ANSI_RESET = "\033[0m"
 ANSI_BLUE = "\033[34m"
@@ -442,10 +432,10 @@ class PsykerCLI:
             self._println(self._color_banner_line("[metro] calibrating hex-eye matrix...", color=ANSI_BLUE, dim=True))
 
         tones = (ANSI_BRIGHT_BLUE, ANSI_BLUE, ANSI_CYAN, ANSI_BLUE, ANSI_BRIGHT_BLUE)
-        center_line = len(METRO_HEX_EYE_ASCII) // 2
-        for idx, line in enumerate(METRO_HEX_EYE_ASCII):
+        center_line = len(PSYKER_BANNER_ASCII) // 2
+        for idx, line in enumerate(PSYKER_BANNER_ASCII):
             tone = tones[idx % len(tones)]
-            emph = idx in {0, center_line, len(METRO_HEX_EYE_ASCII) - 1}
+            emph = idx in {0, center_line, len(PSYKER_BANNER_ASCII) - 1}
             self._println(self._color_banner_line(line, color=tone, bold=emph))
 
         if self._colors_enabled():

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
 
 from .errors import SourceSpan, SyntaxError
 from .token import Token
@@ -173,7 +172,3 @@ def _is_path_part(ch: str) -> bool:
 
 def tokenize_file(path: Path) -> list[Token]:
     return tokenize(path.read_text(encoding="utf-8"), path=path)
-
-
-def tokenize_many(paths: Iterable[Path]) -> dict[Path, list[Token]]:
-    return {path: tokenize_file(path) for path in paths}

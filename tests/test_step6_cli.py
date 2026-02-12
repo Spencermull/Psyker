@@ -114,8 +114,8 @@ class CLITests(unittest.TestCase):
         output = self.out.getvalue()
         self.assertIn("Psyker v0.1.0 - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
-        self.assertIn("#########################", output)
-        self.assertIn("##  ## ##  ##", output)
+        self.assertIn("____  _____ __  __ _____ ______", output)
+        self.assertIn("/ ____/___/ /  / /  ___/ / /___", output)
 
     def test_help_uses_no_color_when_not_tty(self) -> None:
         self.assertEqual(self.cli.execute_line("help"), 0)

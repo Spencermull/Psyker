@@ -26,6 +26,11 @@ Thumbs.db
 
 # Psyker sandbox (local test dir; do not commit)
 psyker_sandbox/
+.psyker_sandbox_test/
+
+# Build artifacts
+dist-banner/
+*.vsix
 
 # Local / secrets (do not commit)
 *.local
