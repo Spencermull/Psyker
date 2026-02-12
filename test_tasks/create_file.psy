@@ -1,0 +1,7 @@
+@access {agents: [alpha], workers: [w1]}
+task multi{
+  fs.create "sandbox/test.txt";
+  fs.open "sandbox/test.txt";
+  exec.ps "ps "Write-Output";
+  exec.cmd "echo hi";
+}
