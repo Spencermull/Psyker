@@ -100,6 +100,24 @@ When `prompt_toolkit` is available in a TTY, the terminal uses a blue matrix loo
 If themed input is unavailable, Psyker falls back to the plain REPL behavior.
 Sandbox root defaults to `%USERPROFILE%\\psyker_sandbox` and can be overridden with `PSYKER_SANDBOX_ROOT`.
 
+## Installer (Windows, minimal setup)
+
+For releases, use the installer so users get a single EXE with everything pre-bundled.
+
+**Build the installer** (requires [Inno Setup](https://jrsoftware.org/isinfo.php)):
+
+```powershell
+.\scripts\build_installer.ps1
+```
+
+Output: `dist/Psyker-Setup-0.1.0.exe`
+
+**User flow:** Download the EXE → Run → Next → Install → Finish. No Python, no repo needed. The installer:
+- Installs Psyker to `%LOCALAPPDATA%\Psyker`
+- Pre-creates the sandbox (`%USERPROFILE%\psyker_sandbox\workspace`, `logs`, `tmp`)
+- Adds a Start Menu shortcut
+- Optional: desktop shortcut (unchecked by default)
+
 ## Test
 
 ```bash
