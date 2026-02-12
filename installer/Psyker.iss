@@ -32,9 +32,6 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; Minimal wizard: skip dir selection prompt (use default)
 DisableDirPage=yes
 
-; Minimal wizard: skip Start Menu folder selection
-DisableProgramGroupPage=yes
-
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
