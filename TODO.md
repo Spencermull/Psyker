@@ -50,9 +50,9 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 - [x] B4 Root README (install, quick start, run, testing, editor)
 
 **Phase C — Polish (optional)**
-- [ ] C1 VS Code command "Psyker: Run task"
+- [x] C1 VS Code command "Psyker: Run task"
 - [ ] C2 Completions for task names (optional)
-- [ ] C3 CI job for test suite
+- [x] C3 CI job for test suite
 
 
 

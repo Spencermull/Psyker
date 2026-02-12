@@ -28,7 +28,8 @@ class SandboxTests(unittest.TestCase):
 
     def test_resolve_under_root_accepts_relative_inside(self) -> None:
         resolved = self.sandbox.resolve_under_root("workspace/file.txt")
-        self.assertTrue(str(resolved).startswith(str(self.root)))
+        # Use relative_to for robust containment check (avoids path casing issues on Windows CI)
+        resolved.resolve().relative_to(self.root.resolve())
 
     def test_resolve_under_root_rejects_traversal(self) -> None:
         with self.assertRaises(SandboxError):
