@@ -90,6 +90,6 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 
 - [x] Step 1: Task fs.* path resolution aligned with workspace
 - [x] Step 2: CI job added
-- [ ] Step 3: TODO and brief updates completed
+- [x] Step 3: TODO and brief updates completed
 
 
