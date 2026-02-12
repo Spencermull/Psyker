@@ -1,5 +1,4 @@
 @access { agents: [alpha], workers: [w1] }
-task hello {
+task read {
   fs.open "input.txt";
-  exec.ps "Write-Host 'ok'";
 }

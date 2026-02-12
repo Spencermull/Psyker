@@ -86,4 +86,10 @@ Ref: `md contexts/AUTONOMOUS_DEV_PLAN.md`, `md contexts/CODEX_PHASE2_VSCODE.md`
 - [x] Phase 5: run/debug from VS Code
 - [x] Phase 6: documentation polish
 
+## Phase 4 - Spec Alignment + CI (see md contexts/CODEX_PHASE4_SPEC_ALIGNMENT_CI.md)
+
+- [x] Step 1: Task fs.* path resolution aligned with workspace
+- [ ] Step 2: CI job added
+- [ ] Step 3: TODO and brief updates completed
+
 

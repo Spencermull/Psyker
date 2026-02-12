@@ -24,7 +24,7 @@ class ExecutorTests(unittest.TestCase):
 
     def test_run_valid_task(self) -> None:
         self.runtime.load_file(self.grammar / "valid" / "task_basic.psy")
-        input_file = self.sandbox.resolve_under_root("sandbox/input.txt")
+        input_file = self.sandbox.resolve_in_workspace("input.txt")
         input_file.parent.mkdir(parents=True, exist_ok=True)
         input_file.write_text("hello", encoding="utf-8")
 

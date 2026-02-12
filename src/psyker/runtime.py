@@ -132,7 +132,7 @@ class RuntimeState:
     def _run_statement(self, agent_name: str, worker: WorkerDef, op: str, arg: str) -> tuple[str, str]:
         value = _dequote(arg)
         if op == "fs.open":
-            target = self.sandbox.resolve_under_root(value)
+            target = self._resolve_task_fs_target(value)
             if not target.exists() or not target.is_file():
                 self.sandbox.log(agent_name, worker.name, op, "error")
                 raise ExecError(f"File not found for fs.open: {target}")
@@ -141,7 +141,7 @@ class RuntimeState:
             return content, ""
 
         if op == "fs.create":
-            target = self.sandbox.resolve_under_root(value)
+            target = self._resolve_task_fs_target(value)
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.suffix:
                 target.touch(exist_ok=True)
@@ -178,6 +178,12 @@ class RuntimeState:
 
         self.sandbox.log(agent_name, worker.name, op, "ok")
         return proc.stdout, proc.stderr
+
+    def _resolve_task_fs_target(self, value: str) -> Path:
+        candidate = Path(value)
+        if candidate.is_absolute():
+            return self.sandbox.resolve_under_root(value)
+        return self.sandbox.resolve_in_workspace(value)
 
 
 def _dequote(value: str) -> str:

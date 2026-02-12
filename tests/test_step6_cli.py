@@ -38,7 +38,7 @@ class CLITests(unittest.TestCase):
     def test_run_success_with_custom_task(self) -> None:
         self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
         self.cli.execute_line(f'load "{self.grammar / "valid" / "agent_basic.psya"}"')
-        input_file = self.sandbox.resolve_under_root("sandbox/input.txt")
+        input_file = self.sandbox.resolve_in_workspace("input.txt")
         input_file.parent.mkdir(parents=True, exist_ok=True)
         input_file.write_text("hello-cli", encoding="utf-8")
 
@@ -46,7 +46,7 @@ class CLITests(unittest.TestCase):
         task_file.write_text(
             '@access { agents: [alpha], workers: [w1] }\n'
             "task read_only {\n"
-            '  fs.open "sandbox/input.txt";\n'
+            '  fs.open "input.txt";\n'
             "}\n",
             encoding="utf-8",
         )
