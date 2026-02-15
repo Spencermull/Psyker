@@ -40,14 +40,34 @@ except Exception:  # pragma: no cover - optional GUI dependency
 
 LOADABLE_SUFFIXES = {".psy", ".psya", ".psyw"}
 
-COLOR_BG = "#0b0f14"
-COLOR_BG_PANEL = "#0f1520"
-COLOR_BG_INPUT = "#0d1117"
-COLOR_BORDER = "#8b5cf6"
-COLOR_PRIMARY = "#79c0ff"
-COLOR_TEXT = "#dbe7ff"
-COLOR_MUTED = "#6b7280"
-COLOR_ALERT = "#d946ef"
+THEMES: dict[str, dict[str, str]] = {
+    "dark": {
+        "bg": "#0b0f14",
+        "panel_bg": "#0f1520",
+        "input_bg": "#0d1117",
+        "border": "#8b5cf6",
+        "primary": "#79c0ff",
+        "text": "#dbe7ff",
+        "muted": "#6b7280",
+        "alert": "#d946ef",
+        "selected_bg": "#1b2538",
+        "tree_alt_bg": "#121a28",
+        "ram_plot": "#a78bfa",
+    },
+    "light": {
+        "bg": "#eef2ff",
+        "panel_bg": "#f8fafc",
+        "input_bg": "#ffffff",
+        "border": "#a78bfa",
+        "primary": "#2563eb",
+        "text": "#0f172a",
+        "muted": "#475569",
+        "alert": "#d946ef",
+        "selected_bg": "#dbeafe",
+        "tree_alt_bg": "#f1f5f9",
+        "ram_plot": "#7c3aed",
+    },
+}
 
 
 class TopContextBar(QFrame):
@@ -89,9 +109,11 @@ class TopContextBar(QFrame):
 class RightMonitorPanel(QFrame):
     """Monitor panel with metrics and runtime lists."""
 
-    def __init__(self, cli: PsykerCLI, parent: QWidget | None = None) -> None:
+    def __init__(self, cli: PsykerCLI, theme: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._cli = cli
+        self._theme = theme if theme in THEMES else "dark"
+        self._colors = THEMES[self._theme]
         self.setObjectName("RightMonitorPanel")
         self.setFrameShape(QFrame.StyledPanel)
 
@@ -131,6 +153,7 @@ class RightMonitorPanel(QFrame):
             self._update_metrics()
 
         self.refresh_runtime_lists()
+        self._apply_plot_theme()
 
     def _build_metrics_tab(self) -> QWidget:
         widget = QWidget()
@@ -178,21 +201,21 @@ class RightMonitorPanel(QFrame):
 
         plot = pg.PlotWidget()
         plot.setObjectName("MetricsPlot")
-        plot.setBackground(COLOR_BG_INPUT)
+        plot.setBackground(self._colors["input_bg"])
         plot.showGrid(x=True, y=True, alpha=0.12)
         plot.setYRange(0, 100)
         plot.setMouseEnabled(False, False)
         plot.hideButtons()
         plot.setMenuEnabled(False)
-        plot.getAxis("left").setPen(pg.mkPen(COLOR_BORDER))
-        plot.getAxis("bottom").setPen(pg.mkPen(COLOR_BORDER))
-        plot.getAxis("left").setTextPen(pg.mkPen(COLOR_MUTED))
-        plot.getAxis("bottom").setTextPen(pg.mkPen(COLOR_MUTED))
+        plot.getAxis("left").setPen(pg.mkPen(self._colors["border"]))
+        plot.getAxis("bottom").setPen(pg.mkPen(self._colors["border"]))
+        plot.getAxis("left").setTextPen(pg.mkPen(self._colors["muted"]))
+        plot.getAxis("bottom").setTextPen(pg.mkPen(self._colors["muted"]))
         plot.setLabel("left", "%")
         plot.setLabel("bottom", "s")
 
-        self._cpu_curve = plot.plot(pen=pg.mkPen(COLOR_PRIMARY, width=2))
-        self._ram_curve = plot.plot(pen=pg.mkPen("#a78bfa", width=2))
+        self._cpu_curve = plot.plot(pen=pg.mkPen(self._colors["primary"], width=2))
+        self._ram_curve = plot.plot(pen=pg.mkPen(self._colors["ram_plot"], width=2))
         self._plot = plot
         layout.addWidget(plot, 1)
         return widget
@@ -236,7 +259,7 @@ class RightMonitorPanel(QFrame):
         row = f"{stamp}  {state:<7} {args[0]}/{args[1]}"
         item = QListWidgetItem(row)
         if exit_code != 0:
-            item.setForeground(QColor(COLOR_ALERT))
+            item.setForeground(QColor(self._colors["alert"]))
         self._progress_list.insertItem(0, item)
         while self._progress_list.count() > 20:
             self._progress_list.takeItem(self._progress_list.count() - 1)
@@ -249,6 +272,24 @@ class RightMonitorPanel(QFrame):
         width = max(len(name) for name in names)
         for idx, name in enumerate(names, start=1):
             target.addItem(f"{idx:>2}  {name:<{width}}")
+
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme if theme in THEMES else "dark"
+        self._colors = THEMES[self._theme]
+        self._apply_plot_theme()
+
+    def _apply_plot_theme(self) -> None:
+        if pg is None or self._plot is None:
+            return
+        self._plot.setBackground(self._colors["input_bg"])
+        self._plot.getAxis("left").setPen(pg.mkPen(self._colors["border"]))
+        self._plot.getAxis("bottom").setPen(pg.mkPen(self._colors["border"]))
+        self._plot.getAxis("left").setTextPen(pg.mkPen(self._colors["muted"]))
+        self._plot.getAxis("bottom").setTextPen(pg.mkPen(self._colors["muted"]))
+        if self._cpu_curve is not None:
+            self._cpu_curve.setPen(pg.mkPen(self._colors["primary"], width=2))
+        if self._ram_curve is not None:
+            self._ram_curve.setPen(pg.mkPen(self._colors["ram_plot"], width=2))
 
     @staticmethod
     def _split_line(line: str) -> tuple[str, list[str]]:
@@ -339,10 +380,11 @@ class ScanlineOverlay(QWidget):
 class PsykerDashboard(QWidget):
     """Main dashboard widget combining top bar, REPL, monitor, and file explorer."""
 
-    def __init__(self, cli: PsykerCLI | None = None, parent: QWidget | None = None) -> None:
+    def __init__(self, cli: PsykerCLI | None = None, theme: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("PsykerDashboard")
         self._cli = cli or create_default_cli()
+        self._theme = theme if theme in THEMES else "dark"
 
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
@@ -352,7 +394,7 @@ class PsykerDashboard(QWidget):
         root.addWidget(self._top, 0)
 
         self._terminal = EmbeddedTerminal(cli=self._cli)
-        self._monitor = RightMonitorPanel(self._cli)
+        self._monitor = RightMonitorPanel(self._cli, theme=self._theme)
         self._explorer = BottomFileExplorer(self._cli, self._terminal)
 
         upper_splitter = QSplitter(Qt.Horizontal)
@@ -373,7 +415,7 @@ class PsykerDashboard(QWidget):
         self._scanline.raise_()
 
         self._terminal.commandExecuted.connect(self._on_command_executed)
-        self._apply_styles()
+        self.set_theme(self._theme)
         self._refresh_panels()
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001 - Qt event type
@@ -389,58 +431,65 @@ class PsykerDashboard(QWidget):
         self._monitor.refresh_runtime_lists()
         self._explorer.refresh_root()
 
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme if theme in THEMES else "dark"
+        self._terminal.set_theme(self._theme)
+        self._monitor.set_theme(self._theme)
+        self._apply_styles()
+
     def _apply_styles(self) -> None:
+        colors = THEMES[self._theme]
         self.setStyleSheet(
             f"""
             QWidget#PsykerDashboard {{
-                background-color: {COLOR_BG};
-                color: {COLOR_TEXT};
+                background-color: {colors['bg']};
+                color: {colors['text']};
                 font-family: Consolas, 'JetBrains Mono', monospace;
                 font-size: 13px;
             }}
             QFrame#TopContextBar, QFrame#RightMonitorPanel, QFrame#BottomFileExplorer {{
-                background-color: {COLOR_BG_PANEL};
-                border: 1px solid {COLOR_BORDER};
+                background-color: {colors['panel_bg']};
+                border: 1px solid {colors['border']};
                 border-radius: 8px;
             }}
             QLabel#ContextTitle {{
-                color: {COLOR_PRIMARY};
+                color: {colors['primary']};
                 font-weight: 700;
             }}
             QLabel#ContextSandbox {{
-                color: {COLOR_TEXT};
+                color: {colors['text']};
             }}
             QLabel#ContextCounts {{
-                color: {COLOR_PRIMARY};
+                color: {colors['primary']};
             }}
             QLabel#PanelTitle {{
-                color: {COLOR_PRIMARY};
+                color: {colors['primary']};
                 font-weight: 700;
                 letter-spacing: 0.5px;
             }}
             QLabel#ExplorerRoot {{
-                color: {COLOR_MUTED};
+                color: {colors['muted']};
             }}
             QTabWidget#MonitorTabs::pane {{
-                border: 1px solid {COLOR_BORDER};
-                background: {COLOR_BG_INPUT};
+                border: 1px solid {colors['border']};
+                background: {colors['input_bg']};
                 top: -1px;
             }}
             QTabBar::tab {{
-                background: {COLOR_BG_PANEL};
-                color: {COLOR_MUTED};
+                background: {colors['panel_bg']};
+                color: {colors['muted']};
                 padding: 6px 10px;
-                border: 1px solid {COLOR_BORDER};
+                border: 1px solid {colors['border']};
                 border-bottom: none;
                 margin-right: 2px;
             }}
             QTabBar::tab:selected {{
-                color: {COLOR_PRIMARY};
-                background: {COLOR_BG_INPUT};
+                color: {colors['primary']};
+                background: {colors['input_bg']};
             }}
             QListWidget#MonitorList {{
-                border: 1px solid {COLOR_BORDER};
-                background: {COLOR_BG_INPUT};
+                border: 1px solid {colors['border']};
+                background: {colors['input_bg']};
                 padding: 4px;
                 outline: none;
             }}
@@ -448,32 +497,31 @@ class PsykerDashboard(QWidget):
                 padding: 3px 6px;
             }}
             QListWidget#MonitorList::item:selected {{
-                background: #1b2538;
-                color: {COLOR_PRIMARY};
+                background: {colors['selected_bg']};
+                color: {colors['primary']};
             }}
             QLabel#MetricLabel {{
-                color: {COLOR_PRIMARY};
+                color: {colors['primary']};
                 font-weight: 700;
             }}
             QLabel#MetricValue {{
-                color: {COLOR_TEXT};
+                color: {colors['text']};
             }}
             QLabel#MetricFallback {{
-                color: {COLOR_MUTED};
+                color: {colors['muted']};
             }}
             QTreeView#ExplorerTree {{
-                border: 1px solid {COLOR_BORDER};
-                background: {COLOR_BG_INPUT};
-                alternate-background-color: #121a28;
+                border: 1px solid {colors['border']};
+                background: {colors['input_bg']};
+                alternate-background-color: {colors['tree_alt_bg']};
                 padding: 4px;
             }}
             QTreeView#ExplorerTree::item {{
                 padding: 3px 6px;
             }}
             QTreeView#ExplorerTree::item:selected {{
-                background: #1b2538;
-                color: {COLOR_PRIMARY};
+                background: {colors['selected_bg']};
+                color: {colors['primary']};
             }}
             """
         )
-

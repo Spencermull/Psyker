@@ -23,6 +23,29 @@ from ..io_layer import strip_ansi
 if TYPE_CHECKING:
     from ..cli import PsykerCLI
 
+TERMINAL_THEMES = {
+    "dark": {
+        "bg": "#0d1117",
+        "text": "#dbe7ff",
+        "border": "#8b5cf6",
+        "focus": "#79c0ff",
+        "button_bg": "#0d1117",
+        "button_text": "#79c0ff",
+        "button_pressed": "#131c2a",
+        "complete_selected": "#1b2538",
+    },
+    "light": {
+        "bg": "#f8fafc",
+        "text": "#0f172a",
+        "border": "#a78bfa",
+        "focus": "#2563eb",
+        "button_bg": "#ffffff",
+        "button_text": "#1d4ed8",
+        "button_pressed": "#e2e8f0",
+        "complete_selected": "#dbeafe",
+    },
+}
+
 
 class AsyncGUIAdapter(QObject):
     """I/O adapter that emits signals for thread-safe UI updates from background execution."""
@@ -144,6 +167,7 @@ class EmbeddedTerminal(QWidget):
     def __init__(self, cli: "PsykerCLI" | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("EmbeddedTerminal")
+        self._theme = "dark"
         self._cli = cli or create_default_cli()
         self._output = self._build_output()
         self._io = AsyncGUIAdapter(self._output)
@@ -158,6 +182,7 @@ class EmbeddedTerminal(QWidget):
         self._setup_ui()
         self._cancel_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
         self._cancel_shortcut.activated.connect(self.request_cancel)
+        self._apply_theme()
         self._print_banner()
 
     def _build_output(self) -> QPlainTextEdit:
@@ -252,6 +277,8 @@ class EmbeddedTerminal(QWidget):
         self._input_line = input_line
         self._completer = completer
         self._stop_button = stop_button
+        self._copy_button = copy_button
+        self._clear_button = clear_button
 
     def _update_completer(self) -> None:
         self._completer.setModel(QStringListModel(self._build_completions()))
@@ -262,6 +289,10 @@ class EmbeddedTerminal(QWidget):
 
     def clear_output(self) -> None:
         self._output.clear()
+
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme if theme in TERMINAL_THEMES else "dark"
+        self._apply_theme()
 
     def _print_banner(self) -> None:
         self._cli._print_startup_banner()
@@ -301,3 +332,43 @@ class EmbeddedTerminal(QWidget):
             return
         self._io.write_error("Cancel requested...")
         self._worker.cancel_requested.emit()
+
+    def _apply_theme(self) -> None:
+        colors = TERMINAL_THEMES.get(self._theme, TERMINAL_THEMES["dark"])
+        self._output.setStyleSheet(
+            "QPlainTextEdit { "
+            f"background-color: {colors['bg']}; color: {colors['text']}; "
+            f"border: 1px solid {colors['border']}; border-radius: 8px; "
+            "padding: 12px; line-height: 1.3; "
+            "}"
+        )
+        self._input_line.setStyleSheet(
+            "QLineEdit { "
+            f"background-color: {colors['bg']}; color: {colors['text']}; "
+            f"border: 1px solid {colors['border']}; border-radius: 8px; "
+            "padding: 10px; "
+            "}"
+            f"QLineEdit:focus {{ border: 1px solid {colors['focus']}; }}"
+        )
+        self._completer.popup().setStyleSheet(
+            "QListView { "
+            f"background-color: {colors['bg']}; color: {colors['text']}; "
+            f"border: 1px solid {colors['border']}; "
+            "}"
+            "QListView::item:selected { "
+            f"background-color: {colors['complete_selected']}; color: {colors['focus']}; "
+            "}"
+        )
+        controls_style = (
+            "QPushButton { "
+            f"background-color: {colors['button_bg']}; color: {colors['button_text']}; "
+            f"border: 1px solid {colors['border']}; border-radius: 6px; "
+            "padding: 6px 10px; "
+            "}"
+            f"QPushButton:hover {{ border: 1px solid {colors['focus']}; }}"
+            f"QPushButton:pressed {{ background-color: {colors['button_pressed']}; }}"
+            "QPushButton:disabled { opacity: 0.5; }"
+        )
+        self._stop_button.setStyleSheet(controls_style)
+        self._copy_button.setStyleSheet(controls_style)
+        self._clear_button.setStyleSheet(controls_style)
