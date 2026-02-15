@@ -1,5 +1,5 @@
-# Build Psyker installer: PyInstaller (dist/Psyker/) + Inno Setup (Psyker-Setup-X.Y.Z.exe)
-# Requires: Python with [build] deps, Inno Setup 6 (iscc.exe in PATH or standard location)
+# Build Psyker installer: PyInstaller (CLI + GUI) + Inno Setup (Psyker-Setup-X.Y.Z.exe)
+# Requires: Python with [build,gui] deps, Inno Setup 6 (iscc.exe in PATH or standard location)
 # Run from repo root.
 
 $ErrorActionPreference = "Stop"
@@ -9,20 +9,28 @@ if (-not (Test-Path (Join-Path $ProjectRoot "psyker.spec"))) {
 }
 Set-Location $ProjectRoot
 
-Write-Host "Building Psyker installer (minimal user intervention)..." -ForegroundColor Cyan
+Write-Host "Building Psyker installer (CLI + GUI)..." -ForegroundColor Cyan
 
-# 1. Build PyInstaller output
-Write-Host "`n[1/3] Running PyInstaller..." -ForegroundColor Yellow
-& python -m pip install -e ".[build]" -q 2>$null
-& pyinstaller psyker.spec
+# 1. Install deps
+& python -m pip install -e ".[build,gui]" -q 2>$null
+
+# 2. Build CLI EXE
+Write-Host "`n[1/4] Building CLI EXE..." -ForegroundColor Yellow
+& pyinstaller psyker.spec -y
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-$distPsyker = Join-Path $ProjectRoot "dist" "Psyker"
-if (-not (Test-Path (Join-Path $distPsyker "Psyker.exe"))) {
-    Write-Error "PyInstaller output not found at dist/Psyker/Psyker.exe"
+if (-not (Test-Path (Join-Path $ProjectRoot "dist" "Psyker" "Psyker.exe"))) {
+    Write-Error "Psyker.exe not found at dist/Psyker/"
 }
 
-# 2. Resolve Inno Setup compiler
+# 3. Build GUI EXE
+Write-Host "`n[2/4] Building GUI EXE..." -ForegroundColor Yellow
+& pyinstaller psyker_gui.spec -y
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if (-not (Test-Path (Join-Path $ProjectRoot "dist" "PsykerGUI" "PsykerGUI.exe"))) {
+    Write-Error "PsykerGUI.exe not found at dist/PsykerGUI/"
+}
+
+# 4. Resolve Inno Setup compiler
 $iscc = $null
 if (Get-Command iscc -ErrorAction SilentlyContinue) {
     $iscc = "iscc"
@@ -35,7 +43,7 @@ if (-not $iscc) {
     Write-Error "Inno Setup not found. Install from https://jrsoftware.org/isinfo.php and ensure iscc.exe is in PATH."
 }
 
-# 3. Read version from pyproject.toml and build installer
+# 5. Read version and build installer
 $pyproject = Get-Content (Join-Path $ProjectRoot "pyproject.toml") -Raw
 if ($pyproject -match 'version\s*=\s*"([^"]+)"') {
     $version = $Matches[1]
@@ -43,11 +51,12 @@ if ($pyproject -match 'version\s*=\s*"([^"]+)"') {
     $version = "0.1.0"
 }
 
-Write-Host "`n[2/3] Building installer (version $version)..." -ForegroundColor Yellow
-& $iscc /DMyAppVersion=$version (Join-Path $ProjectRoot "installer" "Psyker.iss")
+Write-Host "`n[3/4] Building installer (version $version)..." -ForegroundColor Yellow
+$issPath = Join-Path $ProjectRoot "installer" "Psyker.iss"
+& $iscc /DMyAppVersion=$version $issPath
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $setupExe = Join-Path $ProjectRoot "dist" "Psyker-Setup-$version.exe"
-Write-Host "`n[3/3] Done." -ForegroundColor Green
+Write-Host "`n[4/4] Done." -ForegroundColor Green
 Write-Host "Installer: $setupExe" -ForegroundColor Green
-Write-Host "`nUser flow: download exe -> run -> Next -> Install -> Finish. Sandbox pre-created." -ForegroundColor Gray
+Write-Host "`nUser flow: download exe -> run -> Next -> Install -> Finish. Launches Psyker GUI by default." -ForegroundColor Gray

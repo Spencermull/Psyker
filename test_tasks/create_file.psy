@@ -1,7 +1,0 @@
-@access { agents: [alpha], workers: [w1] }
-task create_file {
-  fs.create "test.txt";
-  fs.open "test.txt";
-  exec.ps "Write-Output done";
-  exec.cmd "echo hi";
-}

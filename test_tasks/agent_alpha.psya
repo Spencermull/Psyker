@@ -1,3 +1,0 @@
-agent alpha {
-  use worker w1 count = 1;
-}

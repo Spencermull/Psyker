@@ -9,7 +9,7 @@ First alpha release of Psyker, a DSL runtime for terminal automation on Windows.
 - **Sandbox-only execution:** isolated workspace at `%USERPROFILE%\psyker_sandbox`
 - **VS Code extension:** syntax highlighting, LSP diagnostics, completions, hover, definitions
 - **Standalone EXE:** PyInstaller build, no Python required
-- **Installer:** Inno Setup wizard, minimal user intervention
+- **GUI:** Native desktop app with embedded terminal (PsykerGUI.exe)
 
 ## Install
 
@@ -19,14 +19,13 @@ pip install -e .
 pip install -r requirements-lsp.txt
 ```
 
-**Windows installer (recommended for end users):**
-1. Download `Psyker-Setup-0.1.0.exe` from Assets below
-2. Run → Next → Install → Finish
-3. Launch from Start Menu or `%LOCALAPPDATA%\Psyker\Psyker.exe`
+**Windows installer (recommended):**
+- Download `Psyker-Setup-0.1.0.exe` from Assets → Run → Next → Install → Finish
+- Launches Psyker GUI by default; CLI also available from Start Menu
 
-**Manual (zip):**
-- Download `Psyker-0.1.0.zip` (if attached)
-- Extract and run `Psyker.exe` from the folder
+**Windows (zip):**
+- **CLI:** Download `Psyker-CLI-0.1.0.zip` → extract and run `Psyker.exe`
+- **GUI:** Download `PsykerGUI-0.1.0.zip` → extract and run `PsykerGUI.exe`
 
 ## Quick start
 

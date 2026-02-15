@@ -30,8 +30,25 @@ psyker_sandbox/
 
 # Build artifacts
 dist-banner/
+test_tasks/
 *.vsix
+
+# Planning / spec context (internal; not for repo)
+md contexts/
 
 # Local / secrets (do not commit)
 *.local
 .env.local
+
+# Temporary / scratch
+.tmp_*/
+zz_tmp_*/
+TODO.md
+newlogores.png
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

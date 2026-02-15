@@ -11,6 +11,14 @@ dependencies = ["prompt_toolkit"]
 
 [project.optional-dependencies]
 build = ["pyinstaller>=6.0"]
+gui = [
+    "PySide6",
+    "pyqtgraph",
+    "psutil",
+    "PySide6-Fluent-Widgets",
+    "qt-material",
+    "vispy",
+]
 
 [project.scripts]
 psyker = "psyker.__main__:main"

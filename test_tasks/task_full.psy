@@ -1,7 +1,0 @@
-@access { agents: [alpha], workers: [w1] }
-task full {
-  fs.create "input.txt";
-  fs.open "input.txt";
-  exec.ps "Write-Host 'hello from ps'";
-  exec.cmd "echo hello from cmd";
-}

@@ -1,4 +1,0 @@
-@access { agents: [alpha], workers: [w1] }
-task read {
-  fs.open "input.txt";
-}

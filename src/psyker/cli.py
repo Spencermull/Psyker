@@ -12,6 +12,7 @@ import sys
 from typing import Callable, Dict, Iterable, TextIO
 
 from . import __version__
+from .io_layer import IOAdapter, TextIOAdapter
 from .errors import (
     AccessError,
     DialectError,
@@ -108,10 +109,15 @@ class _PsykerInputLexer:  # prompt_toolkit lexer (duck-typed)
 
 
 class PsykerCLI:
-    def __init__(self, runtime: RuntimeState, out: TextIO | None = None, err: TextIO | None = None) -> None:
+    def __init__(
+        self,
+        runtime: RuntimeState,
+        out: TextIO | None = None,
+        err: TextIO | None = None,
+        io: IOAdapter | None = None,
+    ) -> None:
         self.runtime = runtime
-        self.out = out or sys.stdout
-        self.err = err or sys.stderr
+        self._io = io if io is not None else TextIOAdapter(out=out, err=err)
         self.commands: Dict[str, CommandDef] = {}
         self.last_exit_code = 0
         self._register_commands()
@@ -122,10 +128,8 @@ class PsykerCLI:
         use_prompt_toolkit = (
             _pt_prompt is not None
             and _pt_Style is not None
-            and self.out is sys.stdout
-            and self.err is sys.stderr
+            and self._io.supports_colors
             and self._stream_is_tty(sys.stdin)
-            and self._stream_is_tty(sys.stdout)
         )
 
         pt_style = None
@@ -157,11 +161,15 @@ class PsykerCLI:
                         raise
                     except Exception:
                         use_prompt_toolkit = False
-                        line = input(PROMPT_TEXT)
+                        line = self._io.read_line(PROMPT_TEXT)
                 else:
-                    line = input(PROMPT_TEXT)
+                    line = self._io.read_line(PROMPT_TEXT)
+                if line is None:
+                    self._io.write("")
+                    return self.last_exit_code
+                line = line or ""
             except EOFError:
-                self._println("")
+                self._io.write("")
                 return self.last_exit_code
             code = self.execute_line(line)
             self.last_exit_code = code
@@ -443,18 +451,16 @@ class PsykerCLI:
         self._println("")
 
     def _println(self, text: str) -> None:
-        self.out.write(text + "\n")
-        self.out.flush()
+        self._io.write(text)
 
     def _eprintln(self, text: str) -> None:
-        self.err.write(text + "\n")
-        self.err.flush()
+        self._io.write_error(text)
 
     def _stream_is_tty(self, stream: object) -> bool:
         return bool(getattr(stream, "isatty", lambda: False)())
 
     def _colors_enabled(self) -> bool:
-        return self._stream_is_tty(self.out)
+        return self._io.supports_colors
 
     def _color_command(self, text: str) -> str:
         if not self._colors_enabled():

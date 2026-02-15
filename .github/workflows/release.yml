@@ -32,23 +32,29 @@ jobs:
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[build]"
+          pip install -e ".[build,gui]"
           pip install -r requirements-lsp.txt
 
-      - name: Build PyInstaller output
+      - name: Build CLI EXE
         run: python -m PyInstaller psyker.spec -y
+
+      - name: Build GUI EXE
+        run: python -m PyInstaller psyker_gui.spec -y
 
       - name: Install Inno Setup
         run: choco install innosetup -y
 
       - name: Build installer
-        id: build
         run: |
           $version = (Get-Content pyproject.toml -Raw) -replace '(?s).*version\s*=\s*"([^"]+)".*','$1'
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$version installer\Psyker.iss
-          $exe = Get-ChildItem -Path dist -Filter "Psyker-Setup-*.exe" | Select-Object -First 1
-          if (-not $exe) { Get-ChildItem dist -Recurse; exit 1 }
-          echo "installer=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Package release
+        id: build
+        run: |
+          $version = (Get-Content pyproject.toml -Raw) -replace '(?s).*version\s*=\s*"([^"]+)".*','$1'
+          Compress-Archive -Path dist\Psyker\* -DestinationPath "dist\Psyker-CLI-$version.zip"
+          Compress-Archive -Path dist\PsykerGUI\* -DestinationPath "dist\PsykerGUI-$version.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -57,6 +63,9 @@ jobs:
           name: Psyker ${{ github.event.inputs.tag || github.ref_name }} (Alpha)
           body_path: RELEASE_NOTES_v0.1.0.md
           prerelease: true
-          files: dist/Psyker-Setup-0.1.0.exe
+          files: |
+            dist/Psyker-Setup-*.exe
+            dist/Psyker-CLI-*.zip
+            dist/PsykerGUI-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

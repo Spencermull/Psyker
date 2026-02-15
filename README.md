@@ -53,7 +53,7 @@ python -m pip install prompt_toolkit
 
 ## Run
 
-Start the CLI:
+### CLI (terminal)
 
 ```bash
 psyker
@@ -64,6 +64,15 @@ or:
 ```bash
 python -m psyker
 ```
+
+### GUI (one app with embedded terminal)
+
+```bash
+pip install -e ".[gui]"
+python -m psyker --gui
+```
+
+The GUI is a single app with the Psyker REPL (terminal) embedded inside. Same commands: load, run, ls, stx, etc.
 
 Basic load/run flow:
 
@@ -76,7 +85,13 @@ psyker> run alpha hello
 
 ## Psyker.exe (Themed Terminal)
 
-Build the Windows EXE from repo root with the existing PyInstaller spec:
+Build the Windows EXE from repo root:
+
+```powershell
+.\scripts\build_exe.ps1
+```
+
+Or manually:
 
 ```bash
 python -m pip install -e ".[build]"
@@ -100,11 +115,9 @@ When `prompt_toolkit` is available in a TTY, the terminal uses a blue matrix loo
 If themed input is unavailable, Psyker falls back to the plain REPL behavior.
 Sandbox root defaults to `%USERPROFILE%\\psyker_sandbox` and can be overridden with `PSYKER_SANDBOX_ROOT`.
 
-## Installer (Windows, minimal setup)
+## Installer (Windows)
 
-For releases, use the installer so users get a single EXE with everything pre-bundled.
-
-**Build the installer** (requires [Inno Setup](https://jrsoftware.org/isinfo.php)):
+Build the installer (requires [Inno Setup](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
 .\scripts\build_installer.ps1
@@ -112,11 +125,11 @@ For releases, use the installer so users get a single EXE with everything pre-bu
 
 Output: `dist/Psyker-Setup-0.1.0.exe`
 
-**User flow:** Download the EXE → Run → Next → Install → Finish. No Python, no repo needed. The installer:
-- Installs Psyker to `%LOCALAPPDATA%\Psyker`
-- Pre-creates the sandbox (`%USERPROFILE%\psyker_sandbox\workspace`, `logs`, `tmp`)
-- Adds a Start Menu shortcut
-- Optional: desktop shortcut (unchecked by default)
+**User flow:** Download the EXE → Run → Next → Install → Finish. The installer:
+- Installs both CLI and GUI to `%LOCALAPPDATA%\Psyker`
+- Creates Start Menu shortcut to Psyker GUI (recommended)
+- Optional: CLI shortcut, desktop shortcut
+- Pre-creates sandbox (`%USERPROFILE%\psyker_sandbox`)
 
 ## Test
 

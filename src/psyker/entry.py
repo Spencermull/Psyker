@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 from pathlib import Path
 
@@ -20,8 +21,35 @@ def _ensure_launch_working_directory(sandbox: Sandbox) -> None:
     os.chdir(sandbox.workspace)
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="psyker")
+    parser.add_argument("--gui", action="store_true", help="Launch GUI instead of CLI")
+    args, _ = parser.parse_known_args()
+    return args
+
+
+def run_gui() -> int:
+    """Launch the native desktop GUI. Stub until GUI is implemented."""
+    # Lazy-import to avoid loading Qt when running CLI-only
+    try:
+        from .gui import run_gui_impl
+        return run_gui_impl()
+    except ImportError:
+        # GUI deps not installed or import failed; fall back to CLI with message
+        cli = create_default_cli()
+        _ensure_launch_working_directory(cli.runtime.sandbox)
+        try:
+            cli._io.write_error("GUI dependencies not installed. Run: pip install psyker[gui]")
+        except Exception:
+            pass  # stderr may be None in frozen GUI context
+        return cli.run_repl()
+
+
 def run() -> int:
-    """Create the default runtime and launch the REPL."""
+    """Create the default runtime and launch REPL or GUI based on args."""
+    args = _parse_args()
+    if args.gui:
+        return run_gui()
     cli = create_default_cli()
     _ensure_launch_working_directory(cli.runtime.sandbox)
     return cli.run_repl()

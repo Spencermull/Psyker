@@ -33,8 +33,7 @@ jobs:
       - name: Verify environment
         run: |
           python --version
-          dir
-          if (Test-Path "Grammar Context") { echo "Grammar Context exists" } else { echo "Grammar Context MISSING"; exit 1 }
+          if (-not (Test-Path "Grammar Context")) { Write-Error "Grammar Context missing"; exit 1 }
 
       - name: Run tests
         run: python -m unittest discover -s tests -v
