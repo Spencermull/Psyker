@@ -7,9 +7,12 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, QStringListModel, QThread, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QCompleter,
+    QHBoxLayout,
     QLineEdit,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -193,16 +196,51 @@ class EmbeddedTerminal(QWidget):
         )
         input_line.setCompleter(completer)
 
+        controls_row = QHBoxLayout()
+        controls_row.setContentsMargins(0, 0, 0, 0)
+        controls_row.setSpacing(8)
+        controls_row.addStretch(1)
+
+        copy_button = QPushButton("Copy Output")
+        copy_button.setObjectName("TerminalCopyButton")
+        copy_button.clicked.connect(self.copy_output_to_clipboard)
+        controls_row.addWidget(copy_button)
+
+        clear_button = QPushButton("Clear Output")
+        clear_button.setObjectName("TerminalClearButton")
+        clear_button.clicked.connect(self.clear_output)
+        controls_row.addWidget(clear_button)
+
+        controls_style = (
+            "QPushButton { "
+            "background-color: #0d1117; color: #79c0ff; "
+            "border: 1px solid #8b5cf6; border-radius: 6px; "
+            "padding: 6px 10px; "
+            "}"
+            "QPushButton:hover { border: 1px solid #79c0ff; }"
+            "QPushButton:pressed { background-color: #131c2a; }"
+        )
+        copy_button.setStyleSheet(controls_style)
+        clear_button.setStyleSheet(controls_style)
+
         vlayout = QVBoxLayout(self)
         vlayout.setContentsMargins(12, 12, 12, 12)
         vlayout.setSpacing(10)
         vlayout.addWidget(self._output)
+        vlayout.addLayout(controls_row)
         vlayout.addWidget(input_line)
         self._input_line = input_line
         self._completer = completer
 
     def _update_completer(self) -> None:
         self._completer.setModel(QStringListModel(self._build_completions()))
+
+    def copy_output_to_clipboard(self) -> None:
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self._output.toPlainText())
+
+    def clear_output(self) -> None:
+        self._output.clear()
 
     def _print_banner(self) -> None:
         self._cli._print_startup_banner()
