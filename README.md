@@ -129,8 +129,14 @@ Sandbox root defaults to `%USERPROFILE%\\psyker_sandbox` and can be overridden w
 Build the installer (requires [Inno Setup](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
+# Install Inno Setup (one-time)
+winget install JRSoftware.InnoSetup
+
+# Then close and reopen your terminal, then:
 .\scripts\build_installer.ps1
 ```
+
+Or download Inno Setup from [jrsoftware.org](https://jrsoftware.org/isinfo.php) and install to the default location.
 
 Output: `dist/Psyker-Setup-0.1.0.exe`
 
