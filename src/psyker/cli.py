@@ -115,15 +115,20 @@ class PsykerCLI:
         out: TextIO | None = None,
         err: TextIO | None = None,
         io: IOAdapter | None = None,
+        verbose: bool = False,
     ) -> None:
         self.runtime = runtime
         self._io = io if io is not None else TextIOAdapter(out=out, err=err)
+        self.verbose = verbose
         self.commands: Dict[str, CommandDef] = {}
         self.last_exit_code = 0
         self._register_commands()
 
     def run_repl(self) -> int:
         self._print_startup_banner()
+        self._vprintln(
+            f"sandbox root={self.runtime.sandbox.root} workspace={self.runtime.sandbox.workspace}"
+        )
 
         use_prompt_toolkit = (
             _pt_prompt is not None
@@ -308,6 +313,7 @@ class PsykerCLI:
                 f"Unsupported file extension '{path.suffix}'",
                 hint="Use .psy, .psya, or .psyw.",
             )
+        self._vprintln(f"load path={path.expanduser().resolve(strict=False)}")
         self.runtime.load_file(path)
         self._println(f"loaded: {path}")
         return 0
@@ -315,11 +321,13 @@ class PsykerCLI:
     def _cmd_run(self, args: list[str]) -> int:
         if len(args) != 2:
             raise PsykerError("Usage: run <agent> <task>")
+        self._vprintln(f"run agent={args[0]} task={args[1]}")
         result = self.runtime.run_task(args[0], args[1])
         if result.stdout:
             self._println(result.stdout.rstrip("\n"))
         if result.stderr:
             self._eprintln(result.stderr.rstrip("\n"))
+        self._vprintln(f"run result status={result.status_code} worker={result.worker}")
         self._println(f"status={result.status_code} agent={result.agent} worker={result.worker} task={result.task}")
         return result.status_code
 
@@ -456,6 +464,10 @@ class PsykerCLI:
     def _eprintln(self, text: str) -> None:
         self._io.write_error(text)
 
+    def _vprintln(self, text: str) -> None:
+        if self.verbose:
+            self._eprintln(f"[verbose] {text}")
+
     def _stream_is_tty(self, stream: object) -> bool:
         return bool(getattr(stream, "isatty", lambda: False)())
 
@@ -496,9 +508,14 @@ def map_error_to_exit_code(exc: Exception) -> int:
     return 1
 
 
-def create_default_cli(out: TextIO | None = None, err: TextIO | None = None) -> PsykerCLI:
+def create_default_cli(
+    out: TextIO | None = None,
+    err: TextIO | None = None,
+    *,
+    verbose: bool = False,
+) -> PsykerCLI:
     runtime = RuntimeState(sandbox=Sandbox.create_default())
-    return PsykerCLI(runtime=runtime, out=out, err=err)
+    return PsykerCLI(runtime=runtime, out=out, err=err, verbose=verbose)
 
 
 def _render_table(headers: list[str], rows: Iterable[list[str]]) -> str:

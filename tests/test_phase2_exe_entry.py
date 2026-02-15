@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from psyker import __main__
-from psyker.entry import _ensure_launch_working_directory, run
+from psyker.entry import _ensure_launch_working_directory, _parse_args, run
 
 
 class ExeEntryTests(unittest.TestCase):
@@ -44,10 +45,36 @@ class ExeEntryTests(unittest.TestCase):
                 run_repl=lambda: 5,
             )
             with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
-                with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
-                    result = run()
+                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False)):
+                    with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
+                        result = run()
             self.assertEqual(result, 5)
-            mocked_create.assert_called_once_with()
+            mocked_create.assert_called_once_with(verbose=False)
+
+    def test_parse_args_supports_verbose_flag(self) -> None:
+        with patch.object(sys, "argv", ["psyker", "--verbose"]):
+            args = _parse_args()
+        self.assertTrue(args.verbose)
+        self.assertFalse(args.gui)
+
+        with patch.object(sys, "argv", ["psyker", "-v"]):
+            args = _parse_args()
+        self.assertTrue(args.verbose)
+
+    def test_run_passes_verbose_to_default_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp) / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            fake_cli = SimpleNamespace(
+                runtime=SimpleNamespace(sandbox=SimpleNamespace(workspace=workspace)),
+                run_repl=lambda: 0,
+            )
+            with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
+                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=True)):
+                    with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
+                        result = run()
+            self.assertEqual(result, 0)
+            mocked_create.assert_called_once_with(verbose=True)
 
 
 if __name__ == "__main__":

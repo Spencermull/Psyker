@@ -35,6 +35,17 @@ class CLITests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('"name": "alpha"', self.out.getvalue())
 
+    def test_verbose_mode_logs_load_path_to_stderr(self) -> None:
+        cli = PsykerCLI(self.runtime, out=self.out, err=self.err, verbose=True)
+        code = cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
+        self.assertEqual(code, 0)
+        self.assertIn("[verbose] load path=", self.err.getvalue())
+
+    def test_default_mode_does_not_log_verbose_messages(self) -> None:
+        code = self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
+        self.assertEqual(code, 0)
+        self.assertNotIn("[verbose]", self.err.getvalue())
+
     def test_run_success_with_custom_task(self) -> None:
         self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
         self.cli.execute_line(f'load "{self.grammar / "valid" / "agent_basic.psya"}"')

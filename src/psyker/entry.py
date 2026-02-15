@@ -24,11 +24,17 @@ def _ensure_launch_working_directory(sandbox: Sandbox) -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="psyker")
     parser.add_argument("--gui", action="store_true", help="Launch GUI instead of CLI")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable troubleshooting logs to stderr",
+    )
     args, _ = parser.parse_known_args()
     return args
 
 
-def run_gui() -> int:
+def run_gui(*, verbose: bool = False) -> int:
     """Launch the native desktop GUI. Stub until GUI is implemented."""
     # Lazy-import to avoid loading Qt when running CLI-only
     try:
@@ -36,7 +42,7 @@ def run_gui() -> int:
         return run_gui_impl()
     except ImportError:
         # GUI deps not installed or import failed; fall back to CLI with message
-        cli = create_default_cli()
+        cli = create_default_cli(verbose=verbose)
         _ensure_launch_working_directory(cli.runtime.sandbox)
         try:
             cli._io.write_error("GUI dependencies not installed. Run: pip install psyker[gui]")
@@ -49,7 +55,7 @@ def run() -> int:
     """Create the default runtime and launch REPL or GUI based on args."""
     args = _parse_args()
     if args.gui:
-        return run_gui()
-    cli = create_default_cli()
+        return run_gui(verbose=args.verbose)
+    cli = create_default_cli(verbose=args.verbose)
     _ensure_launch_working_directory(cli.runtime.sandbox)
     return cli.run_repl()
