@@ -219,7 +219,12 @@ class PsykerCLI:
             "stx worker|agent|task <name> [--output table|json]",
             "Inspect one loaded definition.",
         )
-        self._register("load", self._cmd_load, "load <path>", "Load a .psy/.psya/.psyw file.")
+        self._register(
+            "load",
+            self._cmd_load,
+            "load <path> | load --dir <path>",
+            "Load a .psy/.psya/.psyw file or all such files in a directory.",
+        )
         self._register("run", self._cmd_run, "run <agent> <task>", "Run a task through an agent.")
         self._register("open", self._cmd_open, "open <path>", "Print file contents from sandbox workspace.")
         self._register("mkfile", self._cmd_mkfile, "mkfile <path>", "Create a file in sandbox workspace.")
@@ -307,9 +312,15 @@ class PsykerCLI:
         raise PsykerError("stx target must be one of: worker, agent, task")
 
     def _cmd_load(self, args: list[str]) -> int:
-        if len(args) != 1:
-            raise PsykerError("Usage: load <path>")
-        path = Path(args[0])
+        if len(args) == 1:
+            self._load_single_file(Path(args[0]))
+            return 0
+        if len(args) == 2 and args[0] == "--dir":
+            self._load_directory(Path(args[1]))
+            return 0
+        raise PsykerError("Usage: load <path> | load --dir <path>")
+
+    def _load_single_file(self, path: Path) -> None:
         if path.suffix.lower() not in {".psy", ".psya", ".psyw"}:
             raise DialectError(
                 f"Unsupported file extension '{path.suffix}'",
@@ -318,7 +329,22 @@ class PsykerCLI:
         self._vprintln(f"load path={path.expanduser().resolve(strict=False)}")
         self.runtime.load_file(path)
         self._println(f"loaded: {path}")
-        return 0
+
+    def _load_directory(self, directory: Path) -> None:
+        root = directory.expanduser().resolve(strict=False)
+        if not root.exists() or not root.is_dir():
+            raise PsykerError(f"Directory not found: {directory}")
+
+        order = {".psyw": 0, ".psya": 1, ".psy": 2}
+        files = [
+            path
+            for path in root.iterdir()
+            if path.is_file() and path.suffix.lower() in order
+        ]
+        files.sort(key=lambda path: (order[path.suffix.lower()], path.name.lower()))
+
+        for path in files:
+            self._load_single_file(path)
 
     def _cmd_run(self, args: list[str]) -> int:
         if len(args) != 2:

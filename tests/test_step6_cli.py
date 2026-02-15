@@ -36,6 +36,31 @@ class CLITests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn('"name": "alpha"', self.out.getvalue())
 
+    def test_load_dir_loads_worker_agent_task_in_dependency_order(self) -> None:
+        bundle = Path(self.temp.name) / "bundle"
+        bundle.mkdir(parents=True, exist_ok=True)
+
+        worker_path = bundle / "m_worker.psyw"
+        agent_path = bundle / "a_agent.psya"
+        task_path = bundle / "z_task.psy"
+        worker_path.write_text((self.grammar / "valid" / "worker_basic.psyw").read_text(encoding="utf-8"), encoding="utf-8")
+        agent_path.write_text((self.grammar / "valid" / "agent_basic.psya").read_text(encoding="utf-8"), encoding="utf-8")
+        task_path.write_text((self.grammar / "valid" / "task_basic.psy").read_text(encoding="utf-8"), encoding="utf-8")
+
+        code = self.cli.execute_line(f'load --dir "{bundle}"')
+        self.assertEqual(code, 0)
+        self.assertIn("w1", self.runtime.workers)
+        self.assertIn("alpha", self.runtime.agents)
+        self.assertIn("hello", self.runtime.tasks)
+
+        output = self.out.getvalue()
+        worker_idx = output.find(f"loaded: {worker_path}")
+        agent_idx = output.find(f"loaded: {agent_path}")
+        task_idx = output.find(f"loaded: {task_path}")
+        self.assertGreaterEqual(worker_idx, 0)
+        self.assertGreater(agent_idx, worker_idx)
+        self.assertGreater(task_idx, agent_idx)
+
     def test_verbose_mode_logs_load_path_to_stderr(self) -> None:
         cli = PsykerCLI(self.runtime, out=self.out, err=self.err, verbose=True)
         code = cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
