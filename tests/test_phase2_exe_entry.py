@@ -43,9 +43,13 @@ class ExeEntryTests(unittest.TestCase):
             fake_cli = SimpleNamespace(
                 runtime=SimpleNamespace(sandbox=SimpleNamespace(workspace=workspace)),
                 run_repl=lambda: 5,
+                _io=SimpleNamespace(write_error=lambda _msg: None),
             )
             with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
-                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False, version=False)):
+                with patch(
+                    "psyker.entry._parse_args",
+                    return_value=SimpleNamespace(gui=False, verbose=False, version=False, check_updates=False),
+                ):
                     with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
                         result = run()
             self.assertEqual(result, 5)
@@ -68,6 +72,11 @@ class ExeEntryTests(unittest.TestCase):
         self.assertFalse(args.gui)
         self.assertFalse(args.verbose)
 
+    def test_parse_args_supports_check_updates_flag(self) -> None:
+        with patch.object(sys, "argv", ["psyker", "--check-updates"]):
+            args = _parse_args()
+        self.assertTrue(args.check_updates)
+
     def test_run_passes_verbose_to_default_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp) / "workspace"
@@ -75,16 +84,23 @@ class ExeEntryTests(unittest.TestCase):
             fake_cli = SimpleNamespace(
                 runtime=SimpleNamespace(sandbox=SimpleNamespace(workspace=workspace)),
                 run_repl=lambda: 0,
+                _io=SimpleNamespace(write_error=lambda _msg: None),
             )
             with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
-                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=True, version=False)):
+                with patch(
+                    "psyker.entry._parse_args",
+                    return_value=SimpleNamespace(gui=False, verbose=True, version=False, check_updates=False),
+                ):
                     with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
                         result = run()
             self.assertEqual(result, 0)
             mocked_create.assert_called_once_with(verbose=True)
 
     def test_run_version_prints_and_skips_cli(self) -> None:
-        with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False, version=True)):
+        with patch(
+            "psyker.entry._parse_args",
+            return_value=SimpleNamespace(gui=False, verbose=False, version=True, check_updates=False),
+        ):
             with patch("builtins.print") as mocked_print:
                 with patch("psyker.entry.create_default_cli") as mocked_create:
                     with patch("psyker.entry.run_gui") as mocked_run_gui:
@@ -93,6 +109,38 @@ class ExeEntryTests(unittest.TestCase):
         mocked_print.assert_called_once_with(f"Psyker v{__version__}")
         mocked_create.assert_not_called()
         mocked_run_gui.assert_not_called()
+
+    def test_run_starts_update_check_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp) / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            fake_cli = SimpleNamespace(
+                runtime=SimpleNamespace(sandbox=SimpleNamespace(workspace=workspace)),
+                run_repl=lambda: 0,
+                _io=SimpleNamespace(write_error=lambda _msg: None),
+            )
+            with patch("psyker.entry.create_default_cli", return_value=fake_cli):
+                with patch(
+                    "psyker.entry._parse_args",
+                    return_value=SimpleNamespace(gui=False, verbose=False, version=False, check_updates=True),
+                ):
+                    with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
+                        with patch("psyker.entry.start_async_update_check") as mocked_update:
+                            result = run()
+        self.assertEqual(result, 0)
+        mocked_update.assert_called_once()
+        self.assertEqual(mocked_update.call_args.args[0], __version__)
+        self.assertTrue(callable(mocked_update.call_args.args[1]))
+
+    def test_run_passes_check_updates_to_gui(self) -> None:
+        with patch(
+            "psyker.entry._parse_args",
+            return_value=SimpleNamespace(gui=True, verbose=True, version=False, check_updates=True),
+        ):
+            with patch("psyker.entry.run_gui", return_value=9) as mocked_run_gui:
+                result = run()
+        self.assertEqual(result, 9)
+        mocked_run_gui.assert_called_once_with(verbose=True, check_updates=True)
 
 
 if __name__ == "__main__":

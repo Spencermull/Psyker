@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMainWindow
 
+from .. import __version__
+from ..update_check import start_async_update_check
 from .dashboard import PsykerDashboard
 
 
@@ -81,11 +83,19 @@ class PsykerMainWindow(QMainWindow):
         )
         self._settings.setValue("theme", self._theme)
 
+    def show_update_notice(self, message: str) -> None:
+        self.statusBar().showMessage(message, 15000)
 
-def run_gui_impl() -> int:
+
+def run_gui_impl(*, check_updates: bool = False) -> int:
     """Launch the Psyker GUI with embedded terminal (CLI inside the app)."""
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = PsykerMainWindow()
+    if check_updates:
+        start_async_update_check(
+            __version__,
+            lambda message: QTimer.singleShot(0, lambda msg=message: window.show_update_notice(msg)),
+        )
     window.show()
     return app.exec()
