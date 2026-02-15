@@ -5,6 +5,15 @@ Psyker is a small DSL runtime with three dialects:
 - `.psya` for agent definitions
 - `.psyw` for worker definitions
 
+## Documentation
+
+User-facing docs are in `docs/README.md`:
+
+- Quick start
+- CLI command summary
+- GUI usage
+- File format overview (`.psy`, `.psya`, `.psyw`)
+
 ## Install
 
 ```bash
