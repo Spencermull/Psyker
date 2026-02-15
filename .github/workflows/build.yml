@@ -51,6 +51,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[build,gui]"
+          pip install -r requirements-lsp.txt
 
       - name: Build CLI EXE
         run: python -m PyInstaller psyker.spec -y
