@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
-from typing import Dict
+from typing import Callable, Dict
 
 from .errors import AccessError, ExecError, PermissionError, ReferenceError
 from .model import AgentDef, AgentDocument, TaskDef, TaskDocument, WorkerDef, WorkerDocument
@@ -31,6 +31,10 @@ class RuntimeState:
     agents: Dict[str, AgentDef] = field(default_factory=dict)
     tasks: Dict[str, TaskDef] = field(default_factory=dict)
     _rr_index: Dict[str, int] = field(default_factory=dict)
+    _cancel_check: Callable[[], bool] = field(default=lambda: False, repr=False)
+
+    def set_cancel_check(self, checker: Callable[[], bool]) -> None:
+        self._cancel_check = checker
 
     def load_file(self, path: Path) -> object:
         document = parse_path(path)
@@ -70,6 +74,8 @@ class RuntimeState:
         stdout_parts: list[str] = []
         stderr_parts: list[str] = []
         for stmt in task.statements:
+            if self._cancel_requested():
+                raise ExecError("Task cancelled by user.")
             self._enforce_capability(worker, stmt.op)
             out, err = self._run_statement(agent_name, worker, stmt.op, stmt.arg)
             if out:
@@ -164,26 +170,50 @@ class RuntimeState:
         cwd.mkdir(parents=True, exist_ok=True)
 
         try:
-            proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
+            proc = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         except OSError as exc:
             self.sandbox.log(agent_name, worker.name, op, "error")
             raise ExecError(f"Failed to execute '{command[0]}': {exc}") from exc
+
+        while proc.poll() is None:
+            if self._cancel_requested():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=1)
+                self.sandbox.log(agent_name, worker.name, op, "cancelled")
+                raise ExecError("Task cancelled by user.")
+            try:
+                stdout, stderr = proc.communicate(timeout=0.1)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        else:
+            stdout, stderr = proc.communicate()
 
         if proc.returncode != 0:
             self.sandbox.log(agent_name, worker.name, op, "error")
             raise ExecError(
                 f"{op} failed with exit code {proc.returncode}",
-                hint=f"stdout={proc.stdout.strip()} stderr={proc.stderr.strip()}",
+                hint=f"stdout={stdout.strip()} stderr={stderr.strip()}",
             )
 
         self.sandbox.log(agent_name, worker.name, op, "ok")
-        return proc.stdout, proc.stderr
+        return stdout, stderr
 
     def _resolve_task_fs_target(self, value: str) -> Path:
         candidate = Path(value)
         if candidate.is_absolute():
             return self.sandbox.resolve_under_root(value)
         return self.sandbox.resolve_in_workspace(value)
+
+    def _cancel_requested(self) -> bool:
+        try:
+            return bool(self._cancel_check())
+        except Exception:
+            return False
 
 
 def _dequote(value: str) -> str:

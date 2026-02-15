@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QStringListModel, QThread, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCompleter,
@@ -62,17 +62,27 @@ class CommandWorker(QObject):
     """Runs execute_line in a background thread."""
 
     run_requested = Signal(str)
+    cancel_requested = Signal()
     finished = Signal(int)
 
     def __init__(self, cli: "PsykerCLI") -> None:
         super().__init__()
         self._cli = cli
+        self._running = False
         self.run_requested.connect(self._run)
+        self.cancel_requested.connect(self._cancel)
 
     def _run(self, line: str) -> None:
+        self._running = True
+        self._cli.clear_cancel()
         code = self._cli.execute_line(line)
+        self._running = False
         self._cli.last_exit_code = code
         self.finished.emit(code)
+
+    def _cancel(self) -> None:
+        if self._running:
+            self._cli.request_cancel()
 
 
 class ReplLineEdit(QLineEdit):
@@ -144,7 +154,10 @@ class EmbeddedTerminal(QWidget):
         self._thread.start()
         self._worker.finished.connect(self._on_command_finished)
         self._pending_line: str = ""
+        self._command_in_flight = False
         self._setup_ui()
+        self._cancel_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
+        self._cancel_shortcut.activated.connect(self.request_cancel)
         self._print_banner()
 
     def _build_output(self) -> QPlainTextEdit:
@@ -201,6 +214,12 @@ class EmbeddedTerminal(QWidget):
         controls_row.setSpacing(8)
         controls_row.addStretch(1)
 
+        stop_button = QPushButton("Stop")
+        stop_button.setObjectName("TerminalStopButton")
+        stop_button.clicked.connect(self.request_cancel)
+        stop_button.setEnabled(False)
+        controls_row.addWidget(stop_button)
+
         copy_button = QPushButton("Copy Output")
         copy_button.setObjectName("TerminalCopyButton")
         copy_button.clicked.connect(self.copy_output_to_clipboard)
@@ -220,6 +239,7 @@ class EmbeddedTerminal(QWidget):
             "QPushButton:hover { border: 1px solid #79c0ff; }"
             "QPushButton:pressed { background-color: #131c2a; }"
         )
+        stop_button.setStyleSheet(controls_style)
         copy_button.setStyleSheet(controls_style)
         clear_button.setStyleSheet(controls_style)
 
@@ -231,6 +251,7 @@ class EmbeddedTerminal(QWidget):
         vlayout.addWidget(input_line)
         self._input_line = input_line
         self._completer = completer
+        self._stop_button = stop_button
 
     def _update_completer(self) -> None:
         self._completer.setModel(QStringListModel(self._build_completions()))
@@ -254,6 +275,9 @@ class EmbeddedTerminal(QWidget):
         self.execute_command(line)
 
     def _on_command_finished(self, code: int) -> None:
+        self._command_in_flight = False
+        self._input_line.setEnabled(True)
+        self._stop_button.setEnabled(False)
         self.commandExecuted.emit(self._pending_line, code)
         self._update_completer()
 
@@ -261,7 +285,19 @@ class EmbeddedTerminal(QWidget):
         text = line.strip()
         if not text:
             return 0
+        if self._command_in_flight:
+            self._io.write_error("A command is already running. Press Stop or Ctrl+C to cancel it.")
+            return 1
         self._io.write(f"{PROMPT_TEXT}{text}")
         self._pending_line = text
+        self._command_in_flight = True
+        self._input_line.setEnabled(False)
+        self._stop_button.setEnabled(True)
         self._worker.run_requested.emit(text)
         return 0  # Actual code comes via _on_command_finished
+
+    def request_cancel(self) -> None:
+        if not self._command_in_flight:
+            return
+        self._io.write_error("Cancel requested...")
+        self._worker.cancel_requested.emit()

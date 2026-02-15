@@ -120,6 +120,8 @@ class PsykerCLI:
         self.runtime = runtime
         self._io = io if io is not None else TextIOAdapter(out=out, err=err)
         self.verbose = verbose
+        self._cancel_requested = False
+        self.runtime.set_cancel_check(self.is_cancel_requested)
         self.commands: Dict[str, CommandDef] = {}
         self.last_exit_code = 0
         self._register_commands()
@@ -321,8 +323,15 @@ class PsykerCLI:
     def _cmd_run(self, args: list[str]) -> int:
         if len(args) != 2:
             raise PsykerError("Usage: run <agent> <task>")
+        self.clear_cancel()
         self._vprintln(f"run agent={args[0]} task={args[1]}")
-        result = self.runtime.run_task(args[0], args[1])
+        try:
+            result = self.runtime.run_task(args[0], args[1])
+        except ExecError as exc:
+            if exc.message.lower().startswith("task cancelled by user"):
+                self._println("task cancelled")
+                return 130
+            raise
         if result.stdout:
             self._println(result.stdout.rstrip("\n"))
         if result.stderr:
@@ -467,6 +476,15 @@ class PsykerCLI:
     def _vprintln(self, text: str) -> None:
         if self.verbose:
             self._eprintln(f"[verbose] {text}")
+
+    def request_cancel(self) -> None:
+        self._cancel_requested = True
+
+    def clear_cancel(self) -> None:
+        self._cancel_requested = False
+
+    def is_cancel_requested(self) -> bool:
+        return self._cancel_requested
 
     def _stream_is_tty(self, stream: object) -> bool:
         return bool(getattr(stream, "isatty", lambda: False)())

@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from psyker.errors import AccessError, PermissionError, SandboxError
+from psyker.errors import AccessError, ExecError, PermissionError, SandboxError
 from psyker.runtime import RuntimeState
 from psyker.sandbox import Sandbox
 
@@ -49,6 +49,12 @@ class ExecutorTests(unittest.TestCase):
         self.runtime.load_file(self.grammar / "valid" / "task_multiple_stmts.psy")
         with self.assertRaises(PermissionError):
             self.runtime.run_task("alpha", "multi")
+
+    def test_cancelled_task_raises_exec_error(self) -> None:
+        self.runtime.load_file(self.grammar / "valid" / "task_basic.psy")
+        self.runtime.set_cancel_check(lambda: True)
+        with self.assertRaises(ExecError):
+            self.runtime.run_task("alpha", "hello")
 
 
 if __name__ == "__main__":

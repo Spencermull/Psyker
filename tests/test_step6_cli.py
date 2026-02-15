@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from psyker.errors import ExecError
 from psyker.cli import PROMPT_TEXT, PsykerCLI
 from psyker.runtime import RuntimeState
 from psyker.sandbox import Sandbox
@@ -45,6 +46,14 @@ class CLITests(unittest.TestCase):
         code = self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
         self.assertEqual(code, 0)
         self.assertNotIn("[verbose]", self.err.getvalue())
+
+    def test_run_cancellation_prints_message_and_returns_130(self) -> None:
+        self.cli.runtime.load_file(self.grammar / "valid" / "worker_basic.psyw")
+        self.cli.runtime.load_file(self.grammar / "valid" / "agent_basic.psya")
+        with patch.object(self.cli.runtime, "run_task", side_effect=ExecError("Task cancelled by user.")):
+            code = self.cli.execute_line("run alpha hello")
+        self.assertEqual(code, 130)
+        self.assertIn("task cancelled", self.out.getvalue())
 
     def test_run_success_with_custom_task(self) -> None:
         self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
