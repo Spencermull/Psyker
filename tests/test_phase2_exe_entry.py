@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from psyker import __main__
+from psyker import __main__, __version__
 from psyker.entry import _ensure_launch_working_directory, _parse_args, run
 
 
@@ -45,7 +45,7 @@ class ExeEntryTests(unittest.TestCase):
                 run_repl=lambda: 5,
             )
             with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
-                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False)):
+                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False, version=False)):
                     with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
                         result = run()
             self.assertEqual(result, 5)
@@ -61,6 +61,13 @@ class ExeEntryTests(unittest.TestCase):
             args = _parse_args()
         self.assertTrue(args.verbose)
 
+    def test_parse_args_supports_version_flag(self) -> None:
+        with patch.object(sys, "argv", ["psyker", "--version"]):
+            args = _parse_args()
+        self.assertTrue(args.version)
+        self.assertFalse(args.gui)
+        self.assertFalse(args.verbose)
+
     def test_run_passes_verbose_to_default_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp) / "workspace"
@@ -70,11 +77,22 @@ class ExeEntryTests(unittest.TestCase):
                 run_repl=lambda: 0,
             )
             with patch("psyker.entry.create_default_cli", return_value=fake_cli) as mocked_create:
-                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=True)):
+                with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=True, version=False)):
                     with patch("psyker.entry.Path.cwd", return_value=Path(temp)):
                         result = run()
             self.assertEqual(result, 0)
             mocked_create.assert_called_once_with(verbose=True)
+
+    def test_run_version_prints_and_skips_cli(self) -> None:
+        with patch("psyker.entry._parse_args", return_value=SimpleNamespace(gui=False, verbose=False, version=True)):
+            with patch("builtins.print") as mocked_print:
+                with patch("psyker.entry.create_default_cli") as mocked_create:
+                    with patch("psyker.entry.run_gui") as mocked_run_gui:
+                        result = run()
+        self.assertEqual(result, 0)
+        mocked_print.assert_called_once_with(f"Psyker v{__version__}")
+        mocked_create.assert_not_called()
+        mocked_run_gui.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import argparse
 import os
 from pathlib import Path
 
+from . import __version__
 from .cli import create_default_cli
 from .sandbox import Sandbox
 
@@ -29,6 +30,11 @@ def _parse_args() -> argparse.Namespace:
         "--verbose",
         action="store_true",
         help="Enable troubleshooting logs to stderr",
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show Psyker version and exit",
     )
     args, _ = parser.parse_known_args()
     return args
@@ -54,6 +60,9 @@ def run_gui(*, verbose: bool = False) -> int:
 def run() -> int:
     """Create the default runtime and launch REPL or GUI based on args."""
     args = _parse_args()
+    if args.version:
+        print(f"Psyker v{__version__}")
+        return 0
     if args.gui:
         return run_gui(verbose=args.verbose)
     cli = create_default_cli(verbose=args.verbose)
