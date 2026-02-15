@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QStringListModel, QThread, Signal
-from PySide6.QtGui import QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QKeySequence, QShortcut, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QApplication,
     QCompleter,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLineEdit,
     QPlainTextEdit,
@@ -60,12 +61,20 @@ class AsyncGUIAdapter(QObject):
         self.write_error_signal.connect(self._on_write_error)
 
     def _on_write(self, text: str) -> None:
-        plain = strip_ansi(text)
-        self._output.appendPlainText(plain)
+        self._append_line(text)
 
     def _on_write_error(self, text: str) -> None:
-        plain = strip_ansi(text)
-        self._output.appendPlainText(plain)
+        self._append_line(text)
+
+    def _append_line(self, text: str) -> None:
+        plain = strip_ansi(text).replace("\r\n", "\n").replace("\r", "\n").rstrip("\n").expandtabs(4)
+        cursor = self._output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        if plain:
+            cursor.insertText(plain)
+        cursor.insertText("\n")
+        self._output.setTextCursor(cursor)
+        self._output.ensureCursorVisible()
 
     def write(self, text: str) -> None:
         self.write_signal.emit(text)
@@ -168,6 +177,8 @@ class EmbeddedTerminal(QWidget):
         super().__init__(parent)
         self.setObjectName("EmbeddedTerminal")
         self._theme = "dark"
+        self._glow_enabled = True
+        self._output_glow: QGraphicsDropShadowEffect | None = None
         self._cli = cli or create_default_cli()
         self._output = self._build_output()
         self._io = AsyncGUIAdapter(self._output)
@@ -179,6 +190,9 @@ class EmbeddedTerminal(QWidget):
         self._worker.finished.connect(self._on_command_finished)
         self._pending_line: str = ""
         self._command_in_flight = False
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self._shutdown_worker_thread)
         self._setup_ui()
         self._cancel_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
         self._cancel_shortcut.activated.connect(self.request_cancel)
@@ -188,13 +202,21 @@ class EmbeddedTerminal(QWidget):
     def _build_output(self) -> QPlainTextEdit:
         out = QPlainTextEdit()
         out.setReadOnly(True)
-        out.setFont(QFont("Consolas", 12))
+        mono = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        mono.setPointSize(12)
+        mono.setStyleHint(QFont.StyleHint.Monospace)
+        out.setFont(mono)
+        out.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        out.setWordWrapMode(QTextOption.WrapMode.NoWrap)
+        out.setUndoRedoEnabled(False)
+        out.setMaximumBlockCount(3000)
+        out.setTabStopDistance(out.fontMetrics().horizontalAdvance(" ") * 4)
         out.setObjectName("TerminalOutput")
         out.setStyleSheet(
             "QPlainTextEdit { "
             "background-color: #0d1117; color: #dbe7ff; "
             "border: 1px solid #8b5cf6; border-radius: 8px; "
-            "padding: 12px; line-height: 1.3; "
+            "padding: 12px; "
             "}"
         )
         return out
@@ -211,8 +233,8 @@ class EmbeddedTerminal(QWidget):
 
     def _setup_ui(self) -> None:
         input_line = ReplLineEdit()
-        input_line.setPlaceholderText("Type a command and press Enter... (↑↓ history)")
-        input_line.setFont(QFont("Consolas", 12))
+        input_line.setPlaceholderText("Type a command and press Enter... (Up/Down history)")
+        input_line.setFont(self._output.font())
         input_line.setObjectName("TerminalInput")
         input_line.setStyleSheet(
             "QLineEdit { "
@@ -294,6 +316,13 @@ class EmbeddedTerminal(QWidget):
         self._theme = theme if theme in TERMINAL_THEMES else "dark"
         self._apply_theme()
 
+    def set_output_glow_enabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if self._glow_enabled == enabled:
+            return
+        self._glow_enabled = enabled
+        self._apply_theme()
+
     def _print_banner(self) -> None:
         self._cli._print_startup_banner()
 
@@ -333,13 +362,25 @@ class EmbeddedTerminal(QWidget):
         self._io.write_error("Cancel requested...")
         self._worker.cancel_requested.emit()
 
+    def closeEvent(self, event) -> None:  # noqa: ANN001 - Qt close event
+        self._shutdown_worker_thread()
+        super().closeEvent(event)
+
+    def _shutdown_worker_thread(self) -> None:
+        if not self._thread.isRunning():
+            return
+        if self._command_in_flight:
+            self._worker.cancel_requested.emit()
+        self._thread.quit()
+        self._thread.wait(3000)
+
     def _apply_theme(self) -> None:
         colors = TERMINAL_THEMES.get(self._theme, TERMINAL_THEMES["dark"])
         self._output.setStyleSheet(
             "QPlainTextEdit { "
             f"background-color: {colors['bg']}; color: {colors['text']}; "
             f"border: 1px solid {colors['border']}; border-radius: 8px; "
-            "padding: 12px; line-height: 1.3; "
+            "padding: 12px; "
             "}"
         )
         self._input_line.setStyleSheet(
@@ -372,3 +413,18 @@ class EmbeddedTerminal(QWidget):
         self._stop_button.setStyleSheet(controls_style)
         self._copy_button.setStyleSheet(controls_style)
         self._clear_button.setStyleSheet(controls_style)
+        self._apply_output_glow()
+
+    def _apply_output_glow(self) -> None:
+        if not self._glow_enabled:
+            self._output.setGraphicsEffect(None)
+            return
+
+        if self._output_glow is None:
+            self._output_glow = QGraphicsDropShadowEffect(self._output)
+            self._output_glow.setOffset(0, 0)
+
+        self._output_glow.setBlurRadius(18)
+        self._output_glow.setColor(QColor(0, 212, 255, 44) if self._theme == "dark" else QColor(37, 99, 235, 28))
+        self._output.setGraphicsEffect(self._output_glow)
+

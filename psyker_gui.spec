@@ -13,7 +13,7 @@ if not icon_path.exists():
     icon_path = project_root / "icons" / "logo_icon.ico"
 
 datas = []
-for source, target in [("Grammar Context", "Grammar Context")]:
+for source, target in [("Grammar Context", "Grammar Context"), ("assets", "assets")]:
     source_path = project_root / source
     if source_path.exists():
         datas.append((str(source_path), target))
@@ -27,6 +27,7 @@ a = Analysis(
         "PySide6",
         "PySide6.QtCore",
         "PySide6.QtGui",
+        "PySide6.QtSvg",
         "PySide6.QtWidgets",
         "pyqtgraph",
     ],

@@ -12,6 +12,11 @@ from .. import __version__
 from ..update_check import start_async_update_check
 from .dashboard import PsykerDashboard
 
+try:  # pragma: no cover - optional GUI dependency
+    from qt_material import apply_stylesheet as _apply_material_stylesheet
+except Exception:  # pragma: no cover - optional GUI dependency
+    _apply_material_stylesheet = None
+
 
 class PsykerMainWindow(QMainWindow):
     """Main GUI window with a persistent light/dark theme toggle."""
@@ -45,6 +50,7 @@ class PsykerMainWindow(QMainWindow):
 
     def apply_theme(self, theme: str) -> None:
         self._theme = "light" if theme == "light" else "dark"
+        self._apply_global_theme_engines()
         if self._theme == "dark":
             window_bg = "#0b0f14"
             toolbar_bg = "#0f1520"
@@ -82,6 +88,26 @@ class PsykerMainWindow(QMainWindow):
             """
         )
         self._settings.setValue("theme", self._theme)
+
+    def _apply_global_theme_engines(self) -> None:
+        app = QApplication.instance()
+        if app is None:
+            return
+
+        if _apply_material_stylesheet is not None:
+            material_theme = "dark_cyan.xml" if self._theme == "dark" else "light_blue.xml"
+            try:
+                _apply_material_stylesheet(
+                    app,
+                    theme=material_theme,
+                    extra={
+                        "density_scale": "0",
+                        "font_family": "JetBrains Mono",
+                    },
+                )
+            except Exception:
+                pass
+
 
     def show_update_notice(self, message: str) -> None:
         self.statusBar().showMessage(message, 15000)

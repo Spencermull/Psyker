@@ -7,11 +7,12 @@ from datetime import datetime
 from pathlib import Path
 import shlex
 
-from PySide6.QtCore import QDir, QPoint, QTimer, Qt
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtCore import QEasingCurve, QDir, QPoint, QPropertyAnimation, QSize, QTimer, Qt
+from PySide6.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QFileSystemModel,
     QFrame,
+    QGraphicsDropShadowEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from ..cli import PsykerCLI, create_default_cli
 from .terminal import EmbeddedTerminal
+from .visuals import DecalOverlay, render_svg_icon
 
 try:  # pragma: no cover - optional GUI dependency
     import psutil
@@ -36,6 +38,15 @@ try:  # pragma: no cover - optional GUI dependency
     import pyqtgraph as pg
 except Exception:  # pragma: no cover - optional GUI dependency
     pg = None
+
+try:  # pragma: no cover - optional GUI dependency
+    import numpy as np
+    from vispy import app as vispy_app
+    from vispy import scene
+except Exception:  # pragma: no cover - optional GUI dependency
+    np = None
+    vispy_app = None
+    scene = None
 
 
 LOADABLE_SUFFIXES = {".psy", ".psya", ".psyw"}
@@ -70,7 +81,175 @@ THEMES: dict[str, dict[str, str]] = {
 }
 
 
-class TopContextBar(QFrame):
+class TronBackdrop(QWidget):
+    """Animated cyberpunk background layer (VisPy when available, painter fallback otherwise)."""
+
+    def __init__(self, theme: str = "dark", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._theme = theme if theme in THEMES else "dark"
+        self._colors = THEMES[self._theme]
+        self.setObjectName("TronBackdrop")
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._phase = 0.0
+        self._vispy_ready = False
+        self._phase_step = 0.015
+        self._vertical_density = 16
+        self._horizontal_density = 20
+        self._fallback_spacing = 32
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(90)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start()
+
+        if vispy_app is not None and scene is not None and np is not None:
+            try:
+                vispy_app.use_app("pyside6")
+                self._canvas = scene.SceneCanvas(keys=None, bgcolor=self._colors["bg"], show=False)
+                self._native = self._canvas.native
+                self._native.setParent(self)
+                self._view = self._canvas.central_widget.add_view()
+                self._view.camera = scene.cameras.PanZoomCamera(aspect=1)
+                self._view.camera.set_range(x=(-1.0, 1.0), y=(-1.0, 1.0))
+                self._view.camera.interactive = False
+                self._grid = scene.visuals.Line(parent=self._view.scene, width=1)
+                self._pulse = scene.visuals.Line(parent=self._view.scene, width=2)
+                self._vispy_ready = True
+                self._update_vispy_frame()
+            except Exception:
+                self._vispy_ready = False
+
+    def set_performance_profile(self, fullscreen_mode: bool) -> None:
+        if fullscreen_mode:
+            self._timer.setInterval(140)
+            self._phase_step = 0.010
+            self._vertical_density = 10
+            self._horizontal_density = 12
+            self._fallback_spacing = 48
+        else:
+            self._timer.setInterval(90)
+            self._phase_step = 0.015
+            self._vertical_density = 16
+            self._horizontal_density = 20
+            self._fallback_spacing = 32
+        self.update()
+
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme if theme in THEMES else "dark"
+        self._colors = THEMES[self._theme]
+        if self._vispy_ready:
+            self._canvas.bgcolor = self._colors["bg"]
+            self._update_vispy_frame()
+        self.update()
+
+    def resizeEvent(self, event) -> None:  # noqa: ANN001 - Qt event
+        super().resizeEvent(event)
+        if self._vispy_ready:
+            self._native.setGeometry(self.rect())
+
+    def _tick(self) -> None:
+        if not self.isVisible():
+            return
+        self._phase = (self._phase + self._phase_step) % 1.0
+        if self._vispy_ready:
+            self._update_vispy_frame()
+        else:
+            self.update()
+
+    def _update_vispy_frame(self) -> None:
+        if not self._vispy_ready or np is None:
+            return
+        primary = QColor(self._colors["primary"])
+        grid_color = (primary.redF(), primary.greenF(), primary.blueF(), 0.12)
+        pulse_color = (primary.redF(), primary.greenF(), primary.blueF(), 0.28)
+
+        vertical: list[list[float]] = []
+        for x in np.linspace(-1.0, 1.0, self._vertical_density):
+            vertical.append([float(x), -1.0])
+            vertical.append([float(x), 1.0])
+
+        horizontal: list[list[float]] = []
+        y_values = np.linspace(-1.0, 1.0, self._horizontal_density) + (self._phase * 0.35)
+        for y in y_values:
+            wrapped = ((float(y) + 1.0) % 2.0) - 1.0
+            horizontal.append([-1.0, wrapped])
+            horizontal.append([1.0, wrapped])
+
+        points = np.array(vertical + horizontal, dtype=np.float32)
+        connect = np.arange(len(points), dtype=np.int32).reshape(-1, 2)
+        self._grid.set_data(pos=points, connect=connect, color=grid_color)
+
+        pulse_y = -1.0 + (2.0 * self._phase)
+        pulse_points = np.array([[-1.0, pulse_y], [1.0, pulse_y]], dtype=np.float32)
+        self._pulse.set_data(pos=pulse_points, color=pulse_color)
+
+    def paintEvent(self, _event) -> None:  # noqa: ANN001 - Qt event
+        if self._vispy_ready:
+            return
+        painter = QPainter(self)
+        grad = QLinearGradient(0, 0, self.width(), self.height())
+        if self._theme == "dark":
+            grad.setColorAt(0.0, QColor("#060a12"))
+            grad.setColorAt(0.55, QColor("#0b1020"))
+            grad.setColorAt(1.0, QColor("#111a2d"))
+        else:
+            grad.setColorAt(0.0, QColor("#eef2ff"))
+            grad.setColorAt(0.55, QColor("#e2e8f0"))
+            grad.setColorAt(1.0, QColor("#dbeafe"))
+        painter.fillRect(self.rect(), grad)
+
+        line_color = QColor(self._colors["primary"])
+        line_color.setAlpha(26)
+        painter.setPen(QPen(line_color, 1))
+        spacing = self._fallback_spacing
+        offset = int(self._phase * spacing)
+        for x in range(-self.height(), self.width() + self.height(), spacing):
+            painter.drawLine(QPoint(x + offset, self.height()), QPoint(x + self.height() + offset, 0))
+
+
+class HudFrame(QFrame):
+    """Panel base with subtle HUD decals (corner brackets and segmented borders)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._hud_colors = THEMES["dark"]
+
+    def set_hud_theme(self, colors: dict[str, str]) -> None:
+        self._hud_colors = colors
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: ANN001 - Qt event
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        rect = self.rect().adjusted(1, 1, -2, -2)
+
+        border = QColor(self._hud_colors["border"])
+        border.setAlpha(175)
+        painter.setPen(QPen(border, 1.2))
+        painter.drawRoundedRect(rect, 8, 8)
+
+        inner = rect.adjusted(4, 4, -4, -4)
+        inner_border = QColor(self._hud_colors["border"])
+        inner_border.setAlpha(70)
+        painter.setPen(QPen(inner_border, 1))
+        painter.drawRoundedRect(inner, 6, 6)
+
+        accent = QColor(self._hud_colors["primary"])
+        accent.setAlpha(165)
+        painter.setPen(QPen(accent, 1.4))
+        segment = 15
+        painter.drawLine(rect.left() + 8, rect.top() + 1, rect.left() + 8 + segment, rect.top() + 1)
+        painter.drawLine(rect.left() + 1, rect.top() + 8, rect.left() + 1, rect.top() + 8 + segment)
+        painter.drawLine(rect.right() - 8 - segment, rect.top() + 1, rect.right() - 8, rect.top() + 1)
+        painter.drawLine(rect.right() - 1, rect.top() + 8, rect.right() - 1, rect.top() + 8 + segment)
+        painter.drawLine(rect.left() + 1, rect.bottom() - 8 - segment, rect.left() + 1, rect.bottom() - 8)
+        painter.drawLine(rect.left() + 8, rect.bottom() - 1, rect.left() + 8 + segment, rect.bottom() - 1)
+        painter.drawLine(rect.right() - 1, rect.bottom() - 8 - segment, rect.right() - 1, rect.bottom() - 8)
+        painter.drawLine(rect.right() - 8 - segment, rect.bottom() - 1, rect.right() - 8, rect.bottom() - 1)
+
+
+class TopContextBar(HudFrame):
     """Top status bar with app identity, sandbox path, and runtime counts."""
 
     def __init__(self, cli: PsykerCLI, parent: QWidget | None = None) -> None:
@@ -106,7 +285,7 @@ class TopContextBar(QFrame):
         )
 
 
-class RightMonitorPanel(QFrame):
+class RightMonitorPanel(HudFrame):
     """Monitor panel with metrics and runtime lists."""
 
     def __init__(self, cli: PsykerCLI, theme: str = "dark", parent: QWidget | None = None) -> None:
@@ -116,6 +295,7 @@ class RightMonitorPanel(QFrame):
         self._colors = THEMES[self._theme]
         self.setObjectName("RightMonitorPanel")
         self.setFrameShape(QFrame.StyledPanel)
+        self.set_hud_theme(self._colors)
 
         self._cpu_series: deque[float] = deque([0.0] * 90, maxlen=90)
         self._ram_series: deque[float] = deque([0.0] * 90, maxlen=90)
@@ -124,13 +304,23 @@ class RightMonitorPanel(QFrame):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        title = QLabel("MONITOR")
-        title.setObjectName("PanelTitle")
-        layout.addWidget(title)
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(6)
+        self._title_icon = QLabel()
+        self._title_icon.setObjectName("PanelIcon")
+        self._title_label = QLabel("MONITOR")
+        self._title_label.setObjectName("PanelTitle")
+        title_row.addWidget(self._title_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_row.addWidget(self._title_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_row.addStretch(1)
+        layout.addLayout(title_row)
 
         self._tabs = QTabWidget()
         self._tabs.setObjectName("MonitorTabs")
+        self._tabs.setIconSize(QSize(14, 14))
         layout.addWidget(self._tabs, 1)
+        self._tab_icon_names = ["cpu", "agents", "workers", "tasks", "tasks"]
 
         self._agents_list = QListWidget()
         self._workers_list = QListWidget()
@@ -154,6 +344,7 @@ class RightMonitorPanel(QFrame):
 
         self.refresh_runtime_lists()
         self._apply_plot_theme()
+        self._apply_icons()
 
     def _build_metrics_tab(self) -> QWidget:
         widget = QWidget()
@@ -276,7 +467,23 @@ class RightMonitorPanel(QFrame):
     def set_theme(self, theme: str) -> None:
         self._theme = theme if theme in THEMES else "dark"
         self._colors = THEMES[self._theme]
+        self.set_hud_theme(self._colors)
+        self._apply_icons()
         self._apply_plot_theme()
+
+    def _apply_icons(self) -> None:
+        title_icon = render_svg_icon("cpu", self._colors["primary"], size=14)
+        if title_icon is None:
+            self._title_icon.clear()
+        else:
+            self._title_icon.setPixmap(title_icon)
+
+        for index, icon_name in enumerate(self._tab_icon_names):
+            pixmap = render_svg_icon(icon_name, self._colors["primary"], size=14)
+            if pixmap is None:
+                self._tabs.setTabIcon(index, QIcon())
+            else:
+                self._tabs.setTabIcon(index, QIcon(pixmap))
 
     def _apply_plot_theme(self) -> None:
         if pg is None or self._plot is None:
@@ -302,25 +509,35 @@ class RightMonitorPanel(QFrame):
         return parts[0], parts[1:]
 
 
-class BottomFileExplorer(QFrame):
+class BottomFileExplorer(HudFrame):
     """Bottom file explorer rooted at sandbox workspace."""
 
     def __init__(self, cli: PsykerCLI, terminal: EmbeddedTerminal, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._cli = cli
         self._terminal = terminal
+        self._workspace_root: Path | None = None
         self.setObjectName("BottomFileExplorer")
         self.setFrameShape(QFrame.StyledPanel)
+        self.set_hud_theme(THEMES["dark"])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(6)
 
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(6)
+        self._title_icon = QLabel()
+        self._title_icon.setObjectName("PanelIcon")
         title = QLabel("WORKSPACE FILE EXPLORER")
         title.setObjectName("PanelTitle")
+        title_row.addWidget(self._title_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_row.addWidget(title, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_row.addStretch(1)
         self._root_label = QLabel("")
         self._root_label.setObjectName("ExplorerRoot")
-        layout.addWidget(title)
+        layout.addLayout(title_row)
         layout.addWidget(self._root_label)
 
         self._model = QFileSystemModel(self)
@@ -336,20 +553,24 @@ class BottomFileExplorer(QFrame):
         self._tree.setColumnWidth(0, 360)
         layout.addWidget(self._tree, 1)
 
-        self.refresh_root()
+        self._model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Files)
+        self._model.setNameFilters(["*"])  # QFileSystemModel handles live updates from filesystem watchers.
+        self._model.setNameFilterDisables(False)
+        self.refresh_root(force=True)
+        self._apply_icon()
 
-    def refresh_root(self) -> None:
+    def refresh_root(self, force: bool = False) -> None:
         self._cli.runtime.sandbox.ensure_layout()
         workspace = self._cli.runtime.sandbox.workspace
         self._root_label.setText(f"ROOT: {workspace}")
 
-        self._model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Files)
-        self._model.setNameFilters(["*"])  # Show all so workspace updates when files are created
-        self._model.setNameFilterDisables(False)
+        if not force and self._workspace_root == workspace:
+            return
 
         root_index = self._model.setRootPath(str(workspace))
         self._tree.setRootIndex(root_index)
         self._tree.expand(root_index)
+        self._workspace_root = workspace
 
     def _on_double_clicked(self, index) -> None:  # noqa: ANN001 - Qt index type
         if self._model.isDir(index):
@@ -359,22 +580,74 @@ class BottomFileExplorer(QFrame):
             return
         self._terminal.execute_command(f'load "{path}"')
 
+    def set_theme(self, colors: dict[str, str]) -> None:
+        self.set_hud_theme(colors)
+        self._apply_icon(colors["primary"])
+
+    def _apply_icon(self, color: str = "#79c0ff") -> None:
+        pixmap = render_svg_icon("files", color, size=14)
+        if pixmap is None:
+            self._title_icon.clear()
+        else:
+            self._title_icon.setPixmap(pixmap)
+
 
 class ScanlineOverlay(QWidget):
     """Low-opacity scanline overlay (background effect only)."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, theme: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._theme = theme if theme in THEMES else "dark"
+        self._line_spacing = 4
+        self._line_alpha = 10
+        self._cache: QPixmap | None = None
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
 
-    def paintEvent(self, _event) -> None:  # noqa: ANN001 - Qt event type
-        painter = QPainter(self)
+    def set_theme(self, theme: str) -> None:
+        self._theme = theme if theme in THEMES else "dark"
+        self._cache = None
+        self.update()
+
+    def set_performance_profile(self, fullscreen_mode: bool) -> None:
+        if fullscreen_mode:
+            self._line_spacing = 6
+            self._line_alpha = 7
+        else:
+            self._line_spacing = 4
+            self._line_alpha = 10
+        self._cache = None
+        self.update()
+
+    def resizeEvent(self, event) -> None:  # noqa: ANN001 - Qt event type
+        super().resizeEvent(event)
+        self._cache = None
+
+    def _build_cache(self) -> None:
+        if self.width() <= 0 or self.height() <= 0:
+            self._cache = None
+            return
+        pixmap = QPixmap(self.size())
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, False)
-        color = QColor(121, 192, 255, 10)
-        for y in range(0, self.height(), 4):
-            painter.setPen(color)
+        if self._theme == "light":
+            color = QColor(37, 99, 235, max(1, self._line_alpha - 2))
+        else:
+            color = QColor(121, 192, 255, self._line_alpha)
+        painter.setPen(color)
+        for y in range(0, self.height(), self._line_spacing):
             painter.drawLine(QPoint(0, y), QPoint(self.width(), y))
+        painter.end()
+        self._cache = pixmap
+
+    def paintEvent(self, _event) -> None:  # noqa: ANN001 - Qt event type
+        if self._cache is None or self._cache.size() != self.size():
+            self._build_cache()
+        if self._cache is None:
+            return
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, self._cache)
 
 
 class PsykerDashboard(QWidget):
@@ -385,6 +658,14 @@ class PsykerDashboard(QWidget):
         self.setObjectName("PsykerDashboard")
         self._cli = cli or create_default_cli()
         self._theme = theme if theme in THEMES else "dark"
+        self._fullscreen_perf_mode = False
+        self._intro_animations: list[QPropertyAnimation] = []
+        self._panel_effects: list[QGraphicsDropShadowEffect] = []
+
+        self._backdrop = TronBackdrop(theme=self._theme, parent=self)
+        self._decals = DecalOverlay(theme=self._theme, parent=self)
+        self._decals.lower()
+        self._backdrop.lower()
 
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
@@ -411,50 +692,102 @@ class PsykerDashboard(QWidget):
 
         root.addWidget(lower_splitter, 1)
 
-        self._scanline = ScanlineOverlay(self)
-        self._scanline.raise_()
+        self._scanline = ScanlineOverlay(theme=self._theme, parent=self)
+        self._scanline.stackUnder(self._top)
+        self._decals.stackUnder(self._scanline)
+        self._backdrop.stackUnder(self._decals)
+        self._install_panel_glow()
 
         self._terminal.commandExecuted.connect(self._on_command_executed)
         self.set_theme(self._theme)
+        self._update_performance_profile(force=True)
         self._refresh_panels()
+        self._run_intro_animation()
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001 - Qt event type
         super().resizeEvent(event)
+        self._backdrop.setGeometry(self.rect())
+        self._decals.setGeometry(self.rect())
         self._scanline.setGeometry(self.rect())
+        self._update_performance_profile()
 
     def _on_command_executed(self, line: str, code: int) -> None:
         self._monitor.record_command_result(line, code)
-        self._refresh_panels()
+        if self._command_requires_runtime_refresh(line):
+            self._refresh_panels()
 
     def _refresh_panels(self) -> None:
         self._top.refresh()
         self._monitor.refresh_runtime_lists()
-        self._explorer.refresh_root()
 
     def set_theme(self, theme: str) -> None:
         self._theme = theme if theme in THEMES else "dark"
+        colors = THEMES[self._theme]
+        self._backdrop.set_theme(self._theme)
+        self._top.set_hud_theme(colors)
+        self._explorer.set_theme(colors)
         self._terminal.set_theme(self._theme)
         self._monitor.set_theme(self._theme)
+        self._decals.set_theme(self._theme)
+        self._scanline.set_theme(self._theme)
+        glow_color = QColor(0, 212, 255, 36) if self._theme == "dark" else QColor(37, 99, 235, 24)
+        for effect in self._panel_effects:
+            effect.setColor(glow_color)
         self._apply_styles()
+        self._update_performance_profile(force=True)
+
+    def _update_performance_profile(self, force: bool = False) -> None:
+        window = self.window()
+        is_fullscreen = bool(window is not None and window.isFullScreen())
+        large_surface = (self.width() * self.height()) >= 2_300_000
+        enable_perf_mode = is_fullscreen or large_surface
+        if not force and enable_perf_mode == self._fullscreen_perf_mode:
+            return
+        self._fullscreen_perf_mode = enable_perf_mode
+
+        self._backdrop.set_performance_profile(enable_perf_mode)
+        self._decals.set_performance_profile(enable_perf_mode)
+        self._scanline.set_performance_profile(enable_perf_mode)
+        self._terminal.set_output_glow_enabled(not enable_perf_mode)
+
+        for effect in self._panel_effects:
+            effect.setEnabled(not enable_perf_mode)
+
+    @staticmethod
+    def _command_requires_runtime_refresh(line: str) -> bool:
+        try:
+            parts = shlex.split(line)
+        except ValueError:
+            return False
+        if not parts:
+            return False
+        return parts[0] in {"load", "sandbox"}
 
     def _apply_styles(self) -> None:
         colors = THEMES[self._theme]
+        dark_mode = self._theme == "dark"
+        panel_rgba = "rgba(15, 21, 32, 220)" if dark_mode else "rgba(248, 250, 252, 235)"
+        input_rgba = "rgba(13, 17, 23, 220)" if dark_mode else "rgba(255, 255, 255, 240)"
+        input_active_rgba = "rgba(13, 17, 23, 230)" if dark_mode else "rgba(255, 255, 255, 250)"
+        border_rgba = "rgba(139, 92, 246, 140)" if dark_mode else "rgba(167, 139, 250, 150)"
+        list_alt_rgba = "rgba(18, 26, 40, 210)" if dark_mode else "rgba(241, 245, 249, 235)"
         self.setStyleSheet(
             f"""
             QWidget#PsykerDashboard {{
-                background-color: {colors['bg']};
+                background-color: transparent;
                 color: {colors['text']};
                 font-family: Consolas, 'JetBrains Mono', monospace;
                 font-size: 13px;
             }}
             QFrame#TopContextBar, QFrame#RightMonitorPanel, QFrame#BottomFileExplorer {{
-                background-color: {colors['panel_bg']};
-                border: 1px solid {colors['border']};
+                background-color: {panel_rgba};
+                border: 1px solid transparent;
                 border-radius: 8px;
             }}
             QLabel#ContextTitle {{
                 color: {colors['primary']};
                 font-weight: 700;
+                letter-spacing: 0.6px;
             }}
             QLabel#ContextSandbox {{
                 color: {colors['text']};
@@ -467,29 +800,35 @@ class PsykerDashboard(QWidget):
                 font-weight: 700;
                 letter-spacing: 0.5px;
             }}
+            QLabel#PanelIcon {{
+                min-width: 14px;
+                max-width: 14px;
+                min-height: 14px;
+                max-height: 14px;
+            }}
             QLabel#ExplorerRoot {{
                 color: {colors['muted']};
             }}
             QTabWidget#MonitorTabs::pane {{
-                border: 1px solid {colors['border']};
-                background: {colors['input_bg']};
+                border: 1px solid {border_rgba};
+                background: {input_rgba};
                 top: -1px;
             }}
             QTabBar::tab {{
-                background: {colors['panel_bg']};
+                background: {panel_rgba};
                 color: {colors['muted']};
                 padding: 6px 10px;
-                border: 1px solid {colors['border']};
+                border: 1px solid {border_rgba};
                 border-bottom: none;
                 margin-right: 2px;
             }}
             QTabBar::tab:selected {{
                 color: {colors['primary']};
-                background: {colors['input_bg']};
+                background: {input_active_rgba};
             }}
             QListWidget#MonitorList {{
-                border: 1px solid {colors['border']};
-                background: {colors['input_bg']};
+                border: 1px solid {border_rgba};
+                background: {input_rgba};
                 padding: 4px;
                 outline: none;
             }}
@@ -511,9 +850,9 @@ class PsykerDashboard(QWidget):
                 color: {colors['muted']};
             }}
             QTreeView#ExplorerTree {{
-                border: 1px solid {colors['border']};
-                background: {colors['input_bg']};
-                alternate-background-color: {colors['tree_alt_bg']};
+                border: 1px solid {border_rgba};
+                background: {input_rgba};
+                alternate-background-color: {list_alt_rgba};
                 padding: 4px;
             }}
             QTreeView#ExplorerTree::item {{
@@ -525,3 +864,25 @@ class PsykerDashboard(QWidget):
             }}
             """
         )
+
+    def _install_panel_glow(self) -> None:
+        self._panel_effects.clear()
+        glow_targets = [self._top, self._monitor, self._explorer]
+        for widget in glow_targets:
+            effect = QGraphicsDropShadowEffect(widget)
+            effect.setBlurRadius(10)
+            effect.setOffset(0, 0)
+            effect.setColor(QColor(0, 212, 255, 36))
+            widget.setGraphicsEffect(effect)
+            self._panel_effects.append(effect)
+
+    def _run_intro_animation(self) -> None:
+        self._intro_animations.clear()
+        for delay_index, effect in enumerate(self._panel_effects):
+            glow = QPropertyAnimation(effect, b"blurRadius", self)
+            glow.setDuration(260 + delay_index * 90)
+            glow.setStartValue(2.0)
+            glow.setEndValue(26.0)
+            glow.setEasingCurve(QEasingCurve.OutCubic)
+            glow.start()
+            self._intro_animations.append(glow)

@@ -15,7 +15,7 @@ if not icon_path.exists():
 
 datas = []
 # Bundle Grammar Context (valid/invalid examples) for users; md contexts excluded (internal specs)
-for source, target in [("Grammar Context", "Grammar Context")]:
+for source, target in [("Grammar Context", "Grammar Context"), ("assets", "assets")]:
     source_path = project_root / source
     if source_path.exists():
         datas.append((str(source_path), target))
