@@ -331,7 +331,9 @@ class PsykerCLI:
         self._println(f"loaded: {path}")
 
     def _load_directory(self, directory: Path) -> None:
-        root = directory.expanduser().resolve(strict=False)
+        # Preserve lexical path form so "loaded: <path>" lines match user input
+        # instead of a fully canonicalized resolve() form that can differ on CI.
+        root = directory.expanduser()
         if not root.exists() or not root.is_dir():
             raise PsykerError(f"Directory not found: {directory}")
 
