@@ -16,7 +16,6 @@ gui = [
     "PySide6",
     "pyqtgraph",
     "psutil",
-    "PySide6-Fluent-Widgets",
     "qt-material",
     "vispy",
 ]

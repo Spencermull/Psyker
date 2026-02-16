@@ -16,6 +16,7 @@ on:
       - "psyker_gui_frozen_entry.py"
       - "src/**"
       - "Grammar Context/**"
+      - "assets/**"
       - "vscode-extension/icons/**"
       - "installer/**"
   pull_request:
@@ -30,6 +31,7 @@ on:
       - "psyker_gui_frozen_entry.py"
       - "src/**"
       - "Grammar Context/**"
+      - "assets/**"
       - "vscode-extension/icons/**"
       - "installer/**"
 
