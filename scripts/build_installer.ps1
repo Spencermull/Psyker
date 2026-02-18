@@ -11,6 +11,29 @@ Set-Location $ProjectRoot
 
 Write-Host "Building Psyker installer (CLI + GUI)..." -ForegroundColor Cyan
 
+function Resolve-IsccPath {
+    if (Get-Command iscc -ErrorAction SilentlyContinue) {
+        return "iscc"
+    }
+
+    $candidates = @(
+        "C:\Program Files\Inno Setup 6\ISCC.exe",
+        "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+    )
+
+    if ($env:LOCALAPPDATA) {
+        $candidates += (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 # 1. Install deps (pip may warn about PATH; ignore for this script)
 $ErrorActionPreference = "Continue"
 python -m pip install -e ".[build,gui]" -q 2>&1 | Out-Null
@@ -33,26 +56,13 @@ if (-not (Test-Path (Join-Path $ProjectRoot "dist\PsykerGUI\PsykerGUI.exe"))) {
 }
 
 # 4. Resolve Inno Setup compiler
-$iscc = $null
-if (Get-Command iscc -ErrorAction SilentlyContinue) {
-    $iscc = "iscc"
-} elseif (Test-Path "C:\Program Files\Inno Setup 6\ISCC.exe") {
-    $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
-} elseif (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-    $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-}
+$iscc = Resolve-IsccPath
 if (-not $iscc) {
     Write-Host "Inno Setup not found. Installing via winget..." -ForegroundColor Yellow
     winget install JRSoftware.InnoSetup --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
     # winget returns non-zero if already installed; refresh PATH and retry
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-    if (Get-Command iscc -ErrorAction SilentlyContinue) {
-        $iscc = "iscc"
-    } elseif (Test-Path "C:\Program Files\Inno Setup 6\ISCC.exe") {
-        $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
-    } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-    }
+    $iscc = Resolve-IsccPath
 }
 if (-not $iscc) {
     Write-Host ""

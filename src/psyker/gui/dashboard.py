@@ -53,30 +53,34 @@ LOADABLE_SUFFIXES = {".psy", ".psya", ".psyw"}
 
 THEMES: dict[str, dict[str, str]] = {
     "dark": {
-        "bg": "#0b0f14",
-        "panel_bg": "#0f1520",
-        "input_bg": "#0d1117",
-        "border": "#8b5cf6",
-        "primary": "#79c0ff",
-        "text": "#dbe7ff",
-        "muted": "#6b7280",
-        "alert": "#d946ef",
-        "selected_bg": "#1b2538",
-        "tree_alt_bg": "#121a28",
-        "ram_plot": "#a78bfa",
+        "bg": "#06090F",
+        "panel_bg": "#0B0F1A",
+        "input_bg": "#121A2A",
+        "border": "#1E2C44",
+        "primary": "#2FD8FF",
+        "focus": "#00A6FF",
+        "accent": "#E64CFF",
+        "text": "#E6F2FF",
+        "muted": "#9FB4CC",
+        "alert": "#E64CFF",
+        "selected_bg": "#122740",
+        "tree_alt_bg": "#0E1625",
+        "ram_plot": "#9B5CFF",
     },
     "light": {
-        "bg": "#eef2ff",
-        "panel_bg": "#f8fafc",
-        "input_bg": "#ffffff",
-        "border": "#a78bfa",
-        "primary": "#2563eb",
-        "text": "#0f172a",
-        "muted": "#475569",
-        "alert": "#d946ef",
-        "selected_bg": "#dbeafe",
-        "tree_alt_bg": "#f1f5f9",
-        "ram_plot": "#7c3aed",
+        "bg": "#070C14",
+        "panel_bg": "#101625",
+        "input_bg": "#162033",
+        "border": "#243758",
+        "primary": "#2FD8FF",
+        "focus": "#00A6FF",
+        "accent": "#9B5CFF",
+        "text": "#E6F2FF",
+        "muted": "#A8BAD0",
+        "alert": "#E64CFF",
+        "selected_bg": "#17304F",
+        "tree_alt_bg": "#111A2B",
+        "ram_plot": "#9B5CFF",
     },
 }
 
@@ -160,8 +164,9 @@ class TronBackdrop(QWidget):
         if not self._vispy_ready or np is None:
             return
         primary = QColor(self._colors["primary"])
-        grid_color = (primary.redF(), primary.greenF(), primary.blueF(), 0.12)
-        pulse_color = (primary.redF(), primary.greenF(), primary.blueF(), 0.28)
+        accent = QColor(self._colors["accent"])
+        grid_color = (primary.redF(), primary.greenF(), primary.blueF(), 0.04)
+        pulse_color = (accent.redF(), accent.greenF(), accent.blueF(), 0.16)
 
         vertical: list[list[float]] = []
         for x in np.linspace(-1.0, 1.0, self._vertical_density):
@@ -189,17 +194,17 @@ class TronBackdrop(QWidget):
         painter = QPainter(self)
         grad = QLinearGradient(0, 0, self.width(), self.height())
         if self._theme == "dark":
-            grad.setColorAt(0.0, QColor("#060a12"))
-            grad.setColorAt(0.55, QColor("#0b1020"))
-            grad.setColorAt(1.0, QColor("#111a2d"))
+            grad.setColorAt(0.0, QColor("#05080E"))
+            grad.setColorAt(0.55, QColor("#080E18"))
+            grad.setColorAt(1.0, QColor("#101A2B"))
         else:
-            grad.setColorAt(0.0, QColor("#eef2ff"))
-            grad.setColorAt(0.55, QColor("#e2e8f0"))
-            grad.setColorAt(1.0, QColor("#dbeafe"))
+            grad.setColorAt(0.0, QColor("#070C14"))
+            grad.setColorAt(0.55, QColor("#0C1321"))
+            grad.setColorAt(1.0, QColor("#15213A"))
         painter.fillRect(self.rect(), grad)
 
         line_color = QColor(self._colors["primary"])
-        line_color.setAlpha(26)
+        line_color.setAlpha(8)
         painter.setPen(QPen(line_color, 1))
         spacing = self._fallback_spacing
         offset = int(self._phase * spacing)
@@ -225,26 +230,31 @@ class HudFrame(QFrame):
         rect = self.rect().adjusted(1, 1, -2, -2)
 
         border = QColor(self._hud_colors["border"])
-        border.setAlpha(175)
-        painter.setPen(QPen(border, 1.2))
+        border.setAlpha(160)
+        painter.setPen(QPen(border, 1.0))
         painter.drawRoundedRect(rect, 8, 8)
 
         inner = rect.adjusted(4, 4, -4, -4)
-        inner_border = QColor(self._hud_colors["border"])
+        inner_border = QColor(self._hud_colors["primary"])
         inner_border.setAlpha(70)
         painter.setPen(QPen(inner_border, 1))
         painter.drawRoundedRect(inner, 6, 6)
 
-        accent = QColor(self._hud_colors["primary"])
-        accent.setAlpha(165)
-        painter.setPen(QPen(accent, 1.4))
+        cyan = QColor(self._hud_colors["primary"])
+        cyan.setAlpha(170)
+        magenta = QColor(self._hud_colors["accent"])
+        magenta.setAlpha(165)
+        painter.setPen(QPen(cyan, 1.4))
         segment = 15
         painter.drawLine(rect.left() + 8, rect.top() + 1, rect.left() + 8 + segment, rect.top() + 1)
         painter.drawLine(rect.left() + 1, rect.top() + 8, rect.left() + 1, rect.top() + 8 + segment)
+        painter.setPen(QPen(magenta, 1.4))
         painter.drawLine(rect.right() - 8 - segment, rect.top() + 1, rect.right() - 8, rect.top() + 1)
         painter.drawLine(rect.right() - 1, rect.top() + 8, rect.right() - 1, rect.top() + 8 + segment)
+        painter.setPen(QPen(cyan, 1.4))
         painter.drawLine(rect.left() + 1, rect.bottom() - 8 - segment, rect.left() + 1, rect.bottom() - 8)
         painter.drawLine(rect.left() + 8, rect.bottom() - 1, rect.left() + 8 + segment, rect.bottom() - 1)
+        painter.setPen(QPen(magenta, 1.4))
         painter.drawLine(rect.right() - 1, rect.bottom() - 8 - segment, rect.right() - 1, rect.bottom() - 8)
         painter.drawLine(rect.right() - 8 - segment, rect.bottom() - 1, rect.right() - 8, rect.bottom() - 1)
 
@@ -319,7 +329,7 @@ class TopContextBar(HudFrame):
         super().set_hud_theme(colors)
         self._apply_icons(colors["primary"])
 
-    def _apply_icons(self, color: str = "#79c0ff") -> None:
+    def _apply_icons(self, color: str = "#2FD8FF") -> None:
         icon_targets = [
             (self._title_icon, "app"),
             (self._sandbox_icon, "sandbox"),
@@ -641,7 +651,7 @@ class BottomFileExplorer(HudFrame):
         self.set_hud_theme(colors)
         self._apply_icon(colors["primary"])
 
-    def _apply_icon(self, color: str = "#79c0ff") -> None:
+    def _apply_icon(self, color: str = "#2FD8FF") -> None:
         pixmap = render_svg_icon("files", color, size=14)
         if pixmap is None:
             self._title_icon.clear()
@@ -656,7 +666,7 @@ class ScanlineOverlay(QWidget):
         super().__init__(parent)
         self._theme = theme if theme in THEMES else "dark"
         self._line_spacing = 4
-        self._line_alpha = 10
+        self._line_alpha = 8
         self._cache: QPixmap | None = None
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
@@ -669,10 +679,10 @@ class ScanlineOverlay(QWidget):
     def set_performance_profile(self, fullscreen_mode: bool) -> None:
         if fullscreen_mode:
             self._line_spacing = 6
-            self._line_alpha = 7
+            self._line_alpha = 5
         else:
             self._line_spacing = 4
-            self._line_alpha = 10
+            self._line_alpha = 8
         self._cache = None
         self.update()
 
@@ -689,9 +699,9 @@ class ScanlineOverlay(QWidget):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, False)
         if self._theme == "light":
-            color = QColor(37, 99, 235, max(1, self._line_alpha - 2))
+            color = QColor(47, 216, 255, max(1, self._line_alpha - 1))
         else:
-            color = QColor(121, 192, 255, self._line_alpha)
+            color = QColor(47, 216, 255, self._line_alpha)
         painter.setPen(color)
         for y in range(0, self.height(), self._line_spacing):
             painter.drawLine(QPoint(0, y), QPoint(self.width(), y))
@@ -787,7 +797,7 @@ class PsykerDashboard(QWidget):
         self._monitor.set_theme(self._theme)
         self._decals.set_theme(self._theme)
         self._scanline.set_theme(self._theme)
-        glow_color = QColor(0, 212, 255, 36) if self._theme == "dark" else QColor(37, 99, 235, 24)
+        glow_color = QColor(47, 216, 255, 50) if self._theme == "dark" else QColor(47, 216, 255, 44)
         for effect in self._panel_effects:
             effect.setColor(glow_color)
         self._apply_styles()
@@ -823,28 +833,35 @@ class PsykerDashboard(QWidget):
     def _apply_styles(self) -> None:
         colors = THEMES[self._theme]
         dark_mode = self._theme == "dark"
-        panel_rgba = "rgba(15, 21, 32, 220)" if dark_mode else "rgba(248, 250, 252, 235)"
-        input_rgba = "rgba(13, 17, 23, 220)" if dark_mode else "rgba(255, 255, 255, 240)"
-        input_active_rgba = "rgba(13, 17, 23, 230)" if dark_mode else "rgba(255, 255, 255, 250)"
-        border_rgba = "rgba(139, 92, 246, 140)" if dark_mode else "rgba(167, 139, 250, 150)"
-        list_alt_rgba = "rgba(18, 26, 40, 210)" if dark_mode else "rgba(241, 245, 249, 235)"
+        panel_rgba = "rgba(11, 15, 26, 235)" if dark_mode else "rgba(16, 22, 37, 236)"
+        input_rgba = "rgba(18, 26, 42, 233)" if dark_mode else "rgba(22, 32, 51, 236)"
+        border_rgba = "rgba(30, 44, 68, 175)" if dark_mode else "rgba(36, 55, 88, 185)"
+        list_alt_rgba = "rgba(12, 19, 33, 236)" if dark_mode else "rgba(14, 24, 39, 238)"
+        cyan_glow_rgba = "rgba(47, 216, 255, 112)" if dark_mode else "rgba(47, 216, 255, 122)"
+        magenta_glow_rgba = "rgba(230, 76, 255, 110)" if dark_mode else "rgba(155, 92, 255, 120)"
+        cyan_wash_rgba = "rgba(47, 216, 255, 44)" if dark_mode else "rgba(47, 216, 255, 52)"
+        panel_grad = (
+            f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {panel_rgba}, stop:1 {input_rgba})"
+        )
         self.setStyleSheet(
             f"""
             QWidget#PsykerDashboard {{
                 background-color: transparent;
                 color: {colors['text']};
-                font-family: Consolas, 'JetBrains Mono', monospace;
+                font-family: 'Segoe UI', 'Noto Sans', sans-serif;
                 font-size: 13px;
             }}
             QFrame#TopContextBar, QFrame#RightMonitorPanel, QFrame#BottomFileExplorer {{
-                background-color: {panel_rgba};
-                border: 1px solid transparent;
-                border-radius: 8px;
+                background: {panel_grad};
+                border: 1px solid {border_rgba};
+                border-radius: 9px;
             }}
             QLabel#ContextTitle {{
                 color: {colors['primary']};
                 font-weight: 700;
-                letter-spacing: 0.6px;
+                letter-spacing: 1px;
+                padding-bottom: 1px;
+                border-bottom: 1px solid {cyan_glow_rgba};
             }}
             QLabel#ContextIcon, QLabel#ContextCounterIcon {{
                 min-width: 14px;
@@ -855,7 +872,7 @@ class PsykerDashboard(QWidget):
             QLabel#ContextSandboxLabel {{
                 color: {colors['primary']};
                 font-weight: 700;
-                letter-spacing: 0.5px;
+                letter-spacing: 0.9px;
             }}
             QLabel#ContextSandbox {{
                 color: {colors['text']};
@@ -863,8 +880,11 @@ class PsykerDashboard(QWidget):
             }}
             QFrame#ContextCounter {{
                 border: 1px solid {border_rgba};
-                border-radius: 6px;
+                border-radius: 7px;
                 background: {input_rgba};
+            }}
+            QFrame#ContextCounter:hover {{
+                border: 1px solid {cyan_glow_rgba};
             }}
             QLabel#ContextCounterLabel {{
                 color: {colors['muted']};
@@ -878,7 +898,9 @@ class PsykerDashboard(QWidget):
             QLabel#PanelTitle {{
                 color: {colors['primary']};
                 font-weight: 700;
-                letter-spacing: 0.5px;
+                letter-spacing: 1px;
+                padding-bottom: 1px;
+                border-bottom: 1px solid {cyan_glow_rgba};
             }}
             QLabel#PanelIcon {{
                 min-width: 14px;
@@ -894,24 +916,33 @@ class PsykerDashboard(QWidget):
                 color: {colors['muted']};
                 font-size: 11px;
                 font-weight: 600;
-                letter-spacing: 0.5px;
+                letter-spacing: 0.8px;
             }}
             QTabWidget#MonitorTabs::pane {{
                 border: 1px solid {border_rgba};
                 background: {input_rgba};
                 top: -1px;
+                border-radius: 8px;
             }}
             QTabBar::tab {{
                 background: {panel_rgba};
                 color: {colors['muted']};
                 padding: 6px 10px;
                 border: 1px solid {border_rgba};
-                border-bottom: none;
+                border-bottom: 1px solid {border_rgba};
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
                 margin-right: 2px;
+            }}
+            QTabBar::tab:hover {{
+                color: {colors['primary']};
+                border-color: {cyan_glow_rgba};
             }}
             QTabBar::tab:selected {{
                 color: {colors['primary']};
-                background: {input_active_rgba};
+                background: {cyan_wash_rgba};
+                border-color: {cyan_glow_rgba};
+                border-bottom: 2px solid {colors['primary']};
             }}
             QListWidget#MonitorList {{
                 border: 1px solid {border_rgba};
@@ -921,12 +952,16 @@ class PsykerDashboard(QWidget):
                 font-family: Consolas, 'JetBrains Mono', monospace;
                 font-size: 12px;
             }}
+            QListWidget#MonitorList:focus {{
+                border: 1px solid {cyan_glow_rgba};
+            }}
             QListWidget#MonitorList::item {{
                 min-height: 20px;
                 padding: 2px 6px;
             }}
             QListWidget#MonitorList::item:selected {{
                 background: {colors['selected_bg']};
+                border: 1px solid {magenta_glow_rgba};
                 color: {colors['primary']};
             }}
             QLabel#MetricLabel {{
@@ -947,8 +982,12 @@ class PsykerDashboard(QWidget):
                 background: {input_rgba};
                 alternate-background-color: {list_alt_rgba};
                 padding: 4px;
+                outline: none;
                 font-family: Consolas, 'JetBrains Mono', monospace;
                 font-size: 12px;
+            }}
+            QTreeView#ExplorerTree:focus {{
+                border: 1px solid {cyan_glow_rgba};
             }}
             QTreeView#ExplorerTree::item {{
                 min-height: 20px;
@@ -956,7 +995,70 @@ class PsykerDashboard(QWidget):
             }}
             QTreeView#ExplorerTree::item:selected {{
                 background: {colors['selected_bg']};
+                border: 1px solid {magenta_glow_rgba};
                 color: {colors['primary']};
+            }}
+            QHeaderView::section {{
+                background: {panel_rgba};
+                color: {colors['muted']};
+                padding: 4px 6px;
+                border: 1px solid {border_rgba};
+                border-top: none;
+                border-left: none;
+                font-size: 11px;
+                letter-spacing: 0.5px;
+            }}
+            QScrollBar:vertical {{
+                background: {input_rgba};
+                width: 8px;
+                margin: 2px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {colors['primary']};
+                min-height: 22px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {colors['focus']};
+            }}
+            QScrollBar::handle:vertical:pressed {{
+                background: {colors['accent']};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
+            QScrollBar:horizontal {{
+                background: {input_rgba};
+                height: 8px;
+                margin: 2px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {colors['primary']};
+                min-width: 22px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:horizontal:hover {{
+                background: {colors['focus']};
+            }}
+            QScrollBar::handle:horizontal:pressed {{
+                background: {colors['accent']};
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                width: 0px;
+            }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background: transparent;
+            }}
+            QSplitter::handle {{
+                background: {border_rgba};
+            }}
+            QSplitter::handle:hover {{
+                background: {cyan_glow_rgba};
             }}
             """
         )
@@ -966,9 +1068,9 @@ class PsykerDashboard(QWidget):
         glow_targets = [self._top, self._monitor, self._explorer]
         for widget in glow_targets:
             effect = QGraphicsDropShadowEffect(widget)
-            effect.setBlurRadius(10)
+            effect.setBlurRadius(8)
             effect.setOffset(0, 0)
-            effect.setColor(QColor(0, 212, 255, 36))
+            effect.setColor(QColor(47, 216, 255, 50))
             widget.setGraphicsEffect(effect)
             self._panel_effects.append(effect)
 
@@ -976,9 +1078,9 @@ class PsykerDashboard(QWidget):
         self._intro_animations.clear()
         for delay_index, effect in enumerate(self._panel_effects):
             glow = QPropertyAnimation(effect, b"blurRadius", self)
-            glow.setDuration(260 + delay_index * 90)
+            glow.setDuration(220 + delay_index * 70)
             glow.setStartValue(2.0)
-            glow.setEndValue(26.0)
+            glow.setEndValue(15.0)
             glow.setEasingCurve(QEasingCurve.OutCubic)
             glow.start()
             self._intro_animations.append(glow)

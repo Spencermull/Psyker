@@ -52,15 +52,21 @@ class PsykerMainWindow(QMainWindow):
         self._theme = "light" if theme == "light" else "dark"
         self._apply_global_theme_engines()
         if self._theme == "dark":
-            window_bg = "#0b0f14"
-            toolbar_bg = "#0f1520"
-            toolbar_fg = "#79c0ff"
-            border = "#8b5cf6"
+            window_bg = "#06090F"
+            toolbar_bg = "#0B0F1A"
+            toolbar_fg = "#E6F2FF"
+            border = "#1E2C44"
+            hover = "#2FD8FF"
+            accent = "#E64CFF"
+            checked_bg = "rgba(47, 216, 255, 32)"
         else:
-            window_bg = "#eef2ff"
-            toolbar_bg = "#f8fafc"
-            toolbar_fg = "#2563eb"
-            border = "#a78bfa"
+            window_bg = "#070C14"
+            toolbar_bg = "#101625"
+            toolbar_fg = "#E6F2FF"
+            border = "#243758"
+            hover = "#2FD8FF"
+            accent = "#9B5CFF"
+            checked_bg = "rgba(47, 216, 255, 40)"
 
         self._dashboard.set_theme(self._theme)
         self._theme_action.blockSignals(True)
@@ -72,7 +78,9 @@ class PsykerMainWindow(QMainWindow):
                 background-color: {window_bg};
             }}
             QToolBar#ViewToolbar {{
-                background-color: {toolbar_bg};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {toolbar_bg},
+                    stop:1 {window_bg});
                 border: 1px solid {border};
                 spacing: 6px;
             }}
@@ -81,9 +89,20 @@ class PsykerMainWindow(QMainWindow):
                 border: 1px solid {border};
                 border-radius: 6px;
                 padding: 6px 10px;
+                background: transparent;
+            }}
+            QToolButton:hover {{
+                color: {hover};
+                border: 1px solid {hover};
+            }}
+            QToolButton:pressed {{
+                color: {accent};
+                border: 1px solid {accent};
             }}
             QToolButton:checked {{
-                background: {toolbar_bg};
+                color: {hover};
+                border: 1px solid {hover};
+                background: {checked_bg};
             }}
             """
         )
@@ -95,7 +114,7 @@ class PsykerMainWindow(QMainWindow):
             return
 
         if _apply_material_stylesheet is not None:
-            material_theme = "dark_cyan.xml" if self._theme == "dark" else "light_blue.xml"
+            material_theme = "dark_cyan.xml"
             try:
                 _apply_material_stylesheet(
                     app,

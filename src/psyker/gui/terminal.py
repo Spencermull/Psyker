@@ -26,24 +26,36 @@ if TYPE_CHECKING:
 
 TERMINAL_THEMES = {
     "dark": {
-        "bg": "#0d1117",
-        "text": "#dbe7ff",
-        "border": "#8b5cf6",
-        "focus": "#79c0ff",
-        "button_bg": "#0d1117",
-        "button_text": "#79c0ff",
-        "button_pressed": "#131c2a",
-        "complete_selected": "#1b2538",
+        "bg": "#121A2A",
+        "panel_bg": "#0B0F1A",
+        "text": "#E6F2FF",
+        "muted": "#9FB4CC",
+        "border": "#1E2C44",
+        "focus": "#2FD8FF",
+        "focus_hot": "#00A6FF",
+        "accent": "#E64CFF",
+        "button_bg": "#0B0F1A",
+        "button_text": "#E6F2FF",
+        "button_pressed": "#15233A",
+        "complete_selected": "#15314D",
+        "selection_bg": "#00A6FF",
+        "selection_text": "#06090F",
     },
     "light": {
-        "bg": "#f8fafc",
-        "text": "#0f172a",
-        "border": "#a78bfa",
-        "focus": "#2563eb",
-        "button_bg": "#ffffff",
-        "button_text": "#1d4ed8",
-        "button_pressed": "#e2e8f0",
-        "complete_selected": "#dbeafe",
+        "bg": "#162033",
+        "panel_bg": "#101625",
+        "text": "#E6F2FF",
+        "muted": "#A8BAD0",
+        "border": "#243758",
+        "focus": "#2FD8FF",
+        "focus_hot": "#00A6FF",
+        "accent": "#9B5CFF",
+        "button_bg": "#101625",
+        "button_text": "#E6F2FF",
+        "button_pressed": "#1B2B43",
+        "complete_selected": "#1A3653",
+        "selection_bg": "#00A6FF",
+        "selection_text": "#06090F",
     },
 }
 
@@ -214,8 +226,8 @@ class EmbeddedTerminal(QWidget):
         out.setObjectName("TerminalOutput")
         out.setStyleSheet(
             "QPlainTextEdit { "
-            "background-color: #0d1117; color: #dbe7ff; "
-            "border: 1px solid #8b5cf6; border-radius: 8px; "
+            "background-color: #121A2A; color: #E6F2FF; "
+            "border: 1px solid #1E2C44; border-radius: 8px; "
             "padding: 12px; "
             "}"
         )
@@ -238,11 +250,11 @@ class EmbeddedTerminal(QWidget):
         input_line.setObjectName("TerminalInput")
         input_line.setStyleSheet(
             "QLineEdit { "
-            "background-color: #0d1117; color: #dbe7ff; "
-            "border: 1px solid #8b5cf6; border-radius: 8px; "
+            "background-color: #121A2A; color: #E6F2FF; "
+            "border: 1px solid #1E2C44; border-radius: 8px; "
             "padding: 10px; "
             "}"
-            "QLineEdit:focus { border: 1px solid #79c0ff; }"
+            "QLineEdit:focus { border: 1px solid #2FD8FF; }"
         )
         input_line.returnPressed.connect(self._on_enter)
 
@@ -250,9 +262,9 @@ class EmbeddedTerminal(QWidget):
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         completer.popup().setStyleSheet(
-            "QListView { background-color: #0d1117; color: #dbe7ff; "
-            "border: 1px solid #8b5cf6; }"
-            "QListView::item:selected { background-color: #1b2538; color: #79c0ff; }"
+            "QListView { background-color: #0B0F1A; color: #E6F2FF; "
+            "border: 1px solid #1E2C44; }"
+            "QListView::item:selected { background-color: #15314D; color: #2FD8FF; }"
         )
         input_line.setCompleter(completer)
 
@@ -263,6 +275,7 @@ class EmbeddedTerminal(QWidget):
 
         stop_button = QPushButton("Stop")
         stop_button.setObjectName("TerminalStopButton")
+        stop_button.setProperty("critical", True)
         stop_button.clicked.connect(self.request_cancel)
         stop_button.setEnabled(False)
         controls_row.addWidget(stop_button)
@@ -279,12 +292,13 @@ class EmbeddedTerminal(QWidget):
 
         controls_style = (
             "QPushButton { "
-            "background-color: #0d1117; color: #79c0ff; "
-            "border: 1px solid #8b5cf6; border-radius: 6px; "
+            "background-color: #0B0F1A; color: #E6F2FF; "
+            "border: 1px solid #1E2C44; border-radius: 6px; "
             "padding: 6px 10px; "
             "}"
-            "QPushButton:hover { border: 1px solid #79c0ff; }"
-            "QPushButton:pressed { background-color: #131c2a; }"
+            "QPushButton:hover { border: 1px solid #2FD8FF; color: #2FD8FF; }"
+            "QPushButton:pressed { background-color: #15233A; border: 1px solid #E64CFF; color: #E64CFF; }"
+            "QPushButton[critical=\"true\"]:enabled { border: 1px solid #E64CFF; color: #E64CFF; }"
         )
         stop_button.setStyleSheet(controls_style)
         copy_button.setStyleSheet(controls_style)
@@ -380,24 +394,54 @@ class EmbeddedTerminal(QWidget):
             "QPlainTextEdit { "
             f"background-color: {colors['bg']}; color: {colors['text']}; "
             f"border: 1px solid {colors['border']}; border-radius: 8px; "
+            f"selection-background-color: {colors['selection_bg']}; "
+            f"selection-color: {colors['selection_text']}; "
             "padding: 12px; "
             "}"
+            "QPlainTextEdit:focus { "
+            f"border: 1px solid {colors['focus']}; "
+            "}"
+            "QPlainTextEdit QScrollBar:vertical { "
+            f"background: {colors['panel_bg']}; "
+            "width: 8px; margin: 2px; border-radius: 4px; "
+            "}"
+            "QPlainTextEdit QScrollBar::handle:vertical { "
+            f"background: {colors['focus']}; "
+            "min-height: 22px; border-radius: 4px; "
+            "}"
+            "QPlainTextEdit QScrollBar::handle:vertical:hover { "
+            f"background: {colors['focus_hot']}; "
+            "}"
+            "QPlainTextEdit QScrollBar::handle:vertical:pressed { "
+            f"background: {colors['accent']}; "
+            "}"
+            "QPlainTextEdit QScrollBar::add-line:vertical, QPlainTextEdit QScrollBar::sub-line:vertical { height: 0px; }"
+            "QPlainTextEdit QScrollBar::add-page:vertical, QPlainTextEdit QScrollBar::sub-page:vertical { background: transparent; }"
         )
         self._input_line.setStyleSheet(
             "QLineEdit { "
             f"background-color: {colors['bg']}; color: {colors['text']}; "
             f"border: 1px solid {colors['border']}; border-radius: 8px; "
+            f"selection-background-color: {colors['selection_bg']}; "
+            f"selection-color: {colors['selection_text']}; "
+            f"placeholder-text-color: {colors['muted']}; "
             "padding: 10px; "
             "}"
             f"QLineEdit:focus {{ border: 1px solid {colors['focus']}; }}"
+            "QLineEdit:disabled { "
+            f"color: {colors['muted']}; border: 1px solid {colors['border']}; "
+            "}"
         )
         self._completer.popup().setStyleSheet(
             "QListView { "
-            f"background-color: {colors['bg']}; color: {colors['text']}; "
+            f"background-color: {colors['panel_bg']}; color: {colors['text']}; "
             f"border: 1px solid {colors['border']}; "
+            "outline: none; "
             "}"
+            "QListView::item { padding: 4px 8px; }"
             "QListView::item:selected { "
             f"background-color: {colors['complete_selected']}; color: {colors['focus']}; "
+            f"border: 1px solid {colors['accent']}; "
             "}"
         )
         controls_style = (
@@ -406,9 +450,10 @@ class EmbeddedTerminal(QWidget):
             f"border: 1px solid {colors['border']}; border-radius: 6px; "
             "padding: 6px 10px; "
             "}"
-            f"QPushButton:hover {{ border: 1px solid {colors['focus']}; }}"
-            f"QPushButton:pressed {{ background-color: {colors['button_pressed']}; }}"
-            "QPushButton:disabled { opacity: 0.5; }"
+            f"QPushButton:hover {{ border: 1px solid {colors['focus']}; color: {colors['focus']}; }}"
+            f"QPushButton:pressed {{ background-color: {colors['button_pressed']}; border: 1px solid {colors['accent']}; color: {colors['accent']}; }}"
+            f"QPushButton[critical=\"true\"]:enabled {{ border: 1px solid {colors['accent']}; color: {colors['accent']}; }}"
+            f"QPushButton:disabled {{ color: {colors['muted']}; border: 1px solid {colors['border']}; }}"
         )
         self._stop_button.setStyleSheet(controls_style)
         self._copy_button.setStyleSheet(controls_style)
@@ -424,7 +469,7 @@ class EmbeddedTerminal(QWidget):
             self._output_glow = QGraphicsDropShadowEffect(self._output)
             self._output_glow.setOffset(0, 0)
 
-        self._output_glow.setBlurRadius(18)
-        self._output_glow.setColor(QColor(0, 212, 255, 44) if self._theme == "dark" else QColor(37, 99, 235, 28))
+        self._output_glow.setBlurRadius(14)
+        self._output_glow.setColor(QColor(47, 216, 255, 58) if self._theme == "dark" else QColor(47, 216, 255, 52))
         self._output.setGraphicsEffect(self._output_glow)
 

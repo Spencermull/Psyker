@@ -59,8 +59,8 @@ class DecalOverlay(QWidget):
     def __init__(self, theme: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._theme = theme
-        self._opacity = 0.06
-        self._full_screen_opacity = 0.035
+        self._opacity = 0.035
+        self._full_screen_opacity = 0.02
         self._use_fullscreen_profile = False
         self._pixmaps = self._load_decals()
         self._scaled: list[QPixmap] = []
@@ -81,6 +81,12 @@ class DecalOverlay(QWidget):
 
     def set_theme(self, theme: str) -> None:
         self._theme = theme
+        if self._theme == "light":
+            self._opacity = 0.04
+            self._full_screen_opacity = 0.022
+        else:
+            self._opacity = 0.035
+            self._full_screen_opacity = 0.02
         self.update()
 
     def set_performance_profile(self, fullscreen_mode: bool) -> None:
@@ -136,4 +142,3 @@ class DecalOverlay(QWidget):
 
         for idx, pixmap in enumerate(self._scaled[:4]):
             painter.drawPixmap(corners[idx], pixmap)
-
