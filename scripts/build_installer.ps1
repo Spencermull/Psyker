@@ -68,7 +68,7 @@ $pyproject = Get-Content (Join-Path $ProjectRoot "pyproject.toml") -Raw
 if ($pyproject -match 'version\s*=\s*"([^"]+)"') {
     $version = $Matches[1]
 } else {
-    $version = "0.1.0"
+    $version = "0.1.1"
 }
 
 Write-Host "`n[3/4] Building installer (version $version)..." -ForegroundColor Yellow

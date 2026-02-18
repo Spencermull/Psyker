@@ -138,7 +138,7 @@ winget install JRSoftware.InnoSetup
 
 Or download Inno Setup from [jrsoftware.org](https://jrsoftware.org/isinfo.php) and install to the default location.
 
-Output: `dist/Psyker-Setup-0.1.0.exe`
+Output: `dist/Psyker-Setup-0.1.1.exe`
 
 **User flow:** Download the EXE → Run → Next → Install → Finish. The installer:
 - Installs both CLI and GUI to `%LOCALAPPDATA%\Psyker`

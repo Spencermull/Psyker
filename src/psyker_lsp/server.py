@@ -45,7 +45,7 @@ from psyker.parser import Parser
 from psyker.validator import ValidationContext, validate_document
 
 SERVER_NAME = "psyker-lsp"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.1.1"
 
 _TASK_NAME_RE = re.compile(r"^\s*task\s+([A-Za-z][A-Za-z0-9_-]*)\b")
 _AGENT_NAME_RE = re.compile(r"^\s*agent\s+([A-Za-z][A-Za-z0-9_-]*)\b")

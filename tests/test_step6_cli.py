@@ -173,7 +173,7 @@ class CLITests(unittest.TestCase):
             code = self.cli.run_repl()
         self.assertEqual(code, 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.0 - DSL runtime for terminal automation", output)
+        self.assertIn("Psyker v0.1.1 - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
         self.assertIn("____  _____ __  __ _____ ______", output)
         self.assertIn("/ ____/___/ /  / /  ___/ / /___", output)
@@ -208,12 +208,12 @@ class CLITests(unittest.TestCase):
 
     def test_help_version(self) -> None:
         self.assertEqual(self.cli.execute_line("help --version"), 0)
-        self.assertIn("Psyker v0.1.0", self.out.getvalue())
+        self.assertIn("Psyker v0.1.1", self.out.getvalue())
 
     def test_help_about(self) -> None:
         self.assertEqual(self.cli.execute_line("help --about"), 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.0 - DSL runtime for terminal automation", output)
+        self.assertIn("Psyker v0.1.1 - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
 
     def test_help_unknown_option_is_clear_error(self) -> None:

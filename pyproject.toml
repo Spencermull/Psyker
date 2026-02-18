@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psyker"
-version = "0.1.0"
+version = "0.1.1"
 description = "PSYKER v0.1 runtime and CLI"
 requires-python = ">=3.10"
 dependencies = ["prompt_toolkit"]

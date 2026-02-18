@@ -3,7 +3,7 @@
 ; Or: scripts\build_installer.ps1 (builds PyInstaller output first, then runs iscc)
 
 #define MyAppName "Psyker"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.1"
 #define MyAppPublisher "Psyker"
 #define MyAppURL "https://github.com/.../Psyker"
 #define MyAppExeName "PsykerGUI.exe"
