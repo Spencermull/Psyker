@@ -50,11 +50,13 @@ PROMPT_TEXT = "PSYKER> "
 try:  # optional; enables live highlighting while typing
     from prompt_toolkit import prompt as _pt_prompt
     from prompt_toolkit.document import Document as _pt_Document
+    from prompt_toolkit.history import InMemoryHistory as _pt_InMemoryHistory
     from prompt_toolkit.lexers import Lexer as _pt_Lexer
     from prompt_toolkit.styles import Style as _pt_Style
 except Exception:  # pragma: no cover - optional dependency
     _pt_prompt = None
     _pt_Document = None
+    _pt_InMemoryHistory = None
     _pt_Lexer = None
     _pt_Style = None
 
@@ -135,12 +137,14 @@ class PsykerCLI:
         use_prompt_toolkit = (
             _pt_prompt is not None
             and _pt_Style is not None
+            and _pt_InMemoryHistory is not None
             and self._io.supports_colors
             and self._stream_is_tty(sys.stdin)
         )
 
         pt_style = None
         pt_lexer = None
+        pt_history = None
         pt_prompt: object = PROMPT_TEXT
         if use_prompt_toolkit:
             pt_style = _pt_Style.from_dict(
@@ -152,6 +156,7 @@ class PsykerCLI:
                 }
             )
             pt_lexer = _PsykerInputLexer(set(self.commands.keys()))
+            pt_history = _pt_InMemoryHistory()
             pt_prompt = [("class:prompt", PROMPT_TEXT)]
 
         while True:
@@ -162,6 +167,7 @@ class PsykerCLI:
                             pt_prompt,
                             style=pt_style,
                             lexer=pt_lexer,
+                            history=pt_history,
                             include_default_pygments_style=False,
                         )
                     except EOFError:
@@ -425,7 +431,14 @@ class PsykerCLI:
         cwd = self.runtime.sandbox.workspace
         cwd.mkdir(parents=True, exist_ok=True)
         try:
-            proc = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
+            proc = subprocess.run(
+                command,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                check=False,
+                **_windows_subprocess_kwargs(),
+            )
         except OSError as exc:
             raise ExecError(f"Failed to execute '{command[0]}': {exc}") from exc
         if proc.stdout:
@@ -587,6 +600,28 @@ def _format_value(value: object) -> str:
     if value is None:
         return "null"
     return str(value)
+
+
+def _windows_subprocess_kwargs() -> dict[str, object]:
+    if sys.platform != "win32":
+        return {}
+
+    kwargs: dict[str, object] = {}
+    create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if create_no_window:
+        kwargs["creationflags"] = create_no_window
+
+    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_cls is None:
+        return kwargs
+
+    startupinfo = startupinfo_cls()
+    use_show_window = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
+    if use_show_window:
+        startupinfo.dwFlags |= use_show_window
+    startupinfo.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
+    kwargs["startupinfo"] = startupinfo
+    return kwargs
 
 
 def _visible_len(text: str) -> int:

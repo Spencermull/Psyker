@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
 import subprocess
 from typing import Callable, Dict
@@ -170,7 +171,14 @@ class RuntimeState:
         cwd.mkdir(parents=True, exist_ok=True)
 
         try:
-            proc = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            proc = subprocess.Popen(
+                command,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                **_windows_subprocess_kwargs(),
+            )
         except OSError as exc:
             self.sandbox.log(agent_name, worker.name, op, "error")
             raise ExecError(f"Failed to execute '{command[0]}': {exc}") from exc
@@ -220,3 +228,25 @@ def _dequote(value: str) -> str:
     if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
         return value[1:-1].replace('\\"', '"')
     return value
+
+
+def _windows_subprocess_kwargs() -> dict[str, object]:
+    if os.name != "nt":
+        return {}
+
+    kwargs: dict[str, object] = {}
+    create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if create_no_window:
+        kwargs["creationflags"] = create_no_window
+
+    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_cls is None:
+        return kwargs
+
+    startupinfo = startupinfo_cls()
+    use_show_window = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
+    if use_show_window:
+        startupinfo.dwFlags |= use_show_window
+    startupinfo.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
+    kwargs["startupinfo"] = startupinfo
+    return kwargs

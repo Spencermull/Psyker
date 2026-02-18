@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -126,6 +127,21 @@ class CLITests(unittest.TestCase):
             mocked.return_value.stderr = "bad"
             self.assertEqual(self.cli.execute_line('cmd "echo hi"'), 5)
 
+    def test_cmd_exec_uses_hidden_windows_subprocess_when_available(self) -> None:
+        if sys.platform != "win32":
+            self.skipTest("Windows-specific subprocess behavior")
+
+        with patch("psyker.cli.subprocess.run") as mocked:
+            mocked.return_value.returncode = 0
+            mocked.return_value.stdout = ""
+            mocked.return_value.stderr = ""
+            code = self.cli.execute_line('cmd "echo hi"')
+
+        self.assertEqual(code, 0)
+        kwargs = mocked.call_args.kwargs
+        self.assertIn("creationflags", kwargs)
+        self.assertIn("startupinfo", kwargs)
+
     def test_sandbox_reset_preserves_or_clears_logs(self) -> None:
         workspace_file = self.sandbox.resolve_in_workspace("logs/out.txt")
         workspace_file.parent.mkdir(parents=True, exist_ok=True)
@@ -225,10 +241,37 @@ class CLITests(unittest.TestCase):
         self.assertEqual(mocked_prompt.call_args.args[0], [("class:prompt", PROMPT_TEXT)])
         self.assertEqual(mocked_prompt.call_args.kwargs["style"], "style-object")
         self.assertIn("lexer", mocked_prompt.call_args.kwargs)
+        self.assertIn("history", mocked_prompt.call_args.kwargs)
         self.assertEqual(mocked_prompt.call_args.kwargs["include_default_pygments_style"], False)
         self.assertEqual(_FakeStyle.captured["prompt"], "ansibrightblue bold")
         self.assertEqual(_FakeStyle.captured["command"], "ansibrightblue bold")
         self.assertEqual(_FakeStyle.captured["flag"], "ansired bold")
+
+    def test_run_repl_reuses_prompt_toolkit_history_across_prompts(self) -> None:
+        cli = PsykerCLI(self.runtime)
+
+        class _FakeStyle:
+            @staticmethod
+            def from_dict(style_dict: dict[str, str]) -> str:
+                return "style-object"
+
+        history_ids: list[int] = []
+
+        def _fake_prompt(*args, **kwargs):
+            history_ids.append(id(kwargs["history"]))
+            if len(history_ids) == 1:
+                return "help --version"
+            raise EOFError
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("sys.stdout.isatty", return_value=True):
+                with patch("psyker.cli._pt_Style", new=_FakeStyle):
+                    with patch("psyker.cli._pt_prompt", side_effect=_fake_prompt):
+                        code = cli.run_repl()
+
+        self.assertEqual(code, 0)
+        self.assertGreaterEqual(len(history_ids), 2)
+        self.assertEqual(len(set(history_ids)), 1)
 
     def test_run_repl_falls_back_when_prompt_toolkit_is_unavailable(self) -> None:
         cli = PsykerCLI(self.runtime)
