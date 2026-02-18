@@ -39,10 +39,20 @@ md contexts/
 # Local / secrets (do not commit)
 *.local
 .env.local
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Temporary / scratch
+/.tmp*/
+/tmp*/
 .tmp_*/
 zz_tmp_*/
+edex-ui*/
 TODO.md
 newlogores.png
 

@@ -257,32 +257,82 @@ class TopContextBar(HudFrame):
         self._cli = cli
         self.setObjectName("TopContextBar")
         self.setFrameShape(QFrame.StyledPanel)
-        self.setFixedHeight(64)
+        self.setFixedHeight(70)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(14)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(10)
 
+        self._title_icon = QLabel()
+        self._title_icon.setObjectName("ContextIcon")
         self._title = QLabel("\u29bf PSYKER v0.1 \u29d7")
         self._title.setObjectName("ContextTitle")
+        self._sandbox_icon = QLabel()
+        self._sandbox_icon.setObjectName("ContextIcon")
+        self._sandbox_key = QLabel("SANDBOX")
+        self._sandbox_key.setObjectName("ContextSandboxLabel")
         self._sandbox = QLabel("")
         self._sandbox.setObjectName("ContextSandbox")
-        self._counts = QLabel("")
-        self._counts.setObjectName("ContextCounts")
-        self._counts.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._sandbox.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        layout.addWidget(self._title, 0)
-        layout.addWidget(self._sandbox, 1)
-        layout.addWidget(self._counts, 0)
+        layout.addWidget(self._title_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._title, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addSpacing(8)
+        layout.addWidget(self._sandbox_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._sandbox_key, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._sandbox, 1, Qt.AlignmentFlag.AlignVCenter)
 
+        self._count_icons: dict[str, QLabel] = {}
+        self._count_values: dict[str, QLabel] = {}
+        for key, title in (("agents", "AGENTS"), ("workers", "WORKERS"), ("tasks", "TASKS")):
+            icon = QLabel()
+            icon.setObjectName("ContextCounterIcon")
+            label = QLabel(title)
+            label.setObjectName("ContextCounterLabel")
+            value = QLabel("00")
+            value.setObjectName("ContextCounterValue")
+
+            chip = QFrame()
+            chip.setObjectName("ContextCounter")
+            chip_layout = QHBoxLayout(chip)
+            chip_layout.setContentsMargins(6, 2, 6, 2)
+            chip_layout.setSpacing(6)
+            chip_layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignVCenter)
+            chip_layout.addWidget(label, 0, Qt.AlignmentFlag.AlignVCenter)
+            chip_layout.addWidget(value, 0, Qt.AlignmentFlag.AlignVCenter)
+            layout.addWidget(chip, 0, Qt.AlignmentFlag.AlignVCenter)
+
+            self._count_icons[key] = icon
+            self._count_values[key] = value
+
+        self._apply_icons()
         self.refresh()
 
     def refresh(self) -> None:
         runtime = self._cli.runtime
-        self._sandbox.setText(f"SANDBOX: {runtime.sandbox.root}")
-        self._counts.setText(
-            f"AGENTS: {len(runtime.agents)}   WORKERS: {len(runtime.workers)}   TASKS: {len(runtime.tasks)}"
-        )
+        self._sandbox.setText(str(runtime.sandbox.root))
+        self._count_values["agents"].setText(f"{len(runtime.agents):02d}")
+        self._count_values["workers"].setText(f"{len(runtime.workers):02d}")
+        self._count_values["tasks"].setText(f"{len(runtime.tasks):02d}")
+
+    def set_hud_theme(self, colors: dict[str, str]) -> None:
+        super().set_hud_theme(colors)
+        self._apply_icons(colors["primary"])
+
+    def _apply_icons(self, color: str = "#79c0ff") -> None:
+        icon_targets = [
+            (self._title_icon, "app"),
+            (self._sandbox_icon, "sandbox"),
+            (self._count_icons["agents"], "agents"),
+            (self._count_icons["workers"], "workers"),
+            (self._count_icons["tasks"], "tasks"),
+        ]
+        for label, icon_name in icon_targets:
+            pixmap = render_svg_icon(icon_name, color, size=14)
+            if pixmap is None:
+                label.clear()
+            else:
+                label.setPixmap(pixmap)
 
 
 class RightMonitorPanel(HudFrame):
@@ -320,7 +370,7 @@ class RightMonitorPanel(HudFrame):
         self._tabs.setObjectName("MonitorTabs")
         self._tabs.setIconSize(QSize(14, 14))
         layout.addWidget(self._tabs, 1)
-        self._tab_icon_names = ["cpu", "agents", "workers", "tasks", "tasks"]
+        self._tab_icon_names = ["cpu", "agents", "workers", "tasks", "progress"]
 
         self._agents_list = QListWidget()
         self._workers_list = QListWidget()
@@ -349,12 +399,16 @@ class RightMonitorPanel(HudFrame):
     def _build_metrics_tab(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        header = QLabel("SYSTEM")
+        header.setObjectName("MetricHeader")
+        layout.addWidget(header)
 
         grid = QGridLayout()
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(4)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(2)
 
         cpu_title = QLabel("CPU:")
         ram_title = QLabel("RAM:")
@@ -369,6 +423,9 @@ class RightMonitorPanel(HudFrame):
         self._cpu_value.setObjectName("MetricValue")
         self._ram_value.setObjectName("MetricValue")
         self._gpu_value.setObjectName("MetricValue")
+        self._cpu_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._ram_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._gpu_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         grid.addWidget(cpu_title, 0, 0)
         grid.addWidget(self._cpu_value, 0, 1)
@@ -425,8 +482,8 @@ class RightMonitorPanel(HudFrame):
             return
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
-        self._cpu_value.setText(f"{cpu:5.1f}%")
-        self._ram_value.setText(f"{ram:5.1f}%")
+        self._cpu_value.setText(f"{cpu:6.1f}%")
+        self._ram_value.setText(f"{ram:6.1f}%")
 
         self._cpu_series.append(cpu)
         self._ram_series.append(ram)
@@ -462,7 +519,7 @@ class RightMonitorPanel(HudFrame):
             return
         width = max(len(name) for name in names)
         for idx, name in enumerate(names, start=1):
-            target.addItem(f"{idx:>2}  {name:<{width}}")
+            target.addItem(f"{idx:>2} | {name:<{width}}")
 
     def set_theme(self, theme: str) -> None:
         self._theme = theme if theme in THEMES else "dark"
@@ -472,7 +529,7 @@ class RightMonitorPanel(HudFrame):
         self._apply_plot_theme()
 
     def _apply_icons(self) -> None:
-        title_icon = render_svg_icon("cpu", self._colors["primary"], size=14)
+        title_icon = render_svg_icon("monitor", self._colors["primary"], size=14)
         if title_icon is None:
             self._title_icon.clear()
         else:
@@ -530,7 +587,7 @@ class BottomFileExplorer(HudFrame):
         title_row.setSpacing(6)
         self._title_icon = QLabel()
         self._title_icon.setObjectName("PanelIcon")
-        title = QLabel("WORKSPACE FILE EXPLORER")
+        title = QLabel("FILES")
         title.setObjectName("PanelTitle")
         title_row.addWidget(self._title_icon, 0, Qt.AlignmentFlag.AlignVCenter)
         title_row.addWidget(title, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -562,7 +619,7 @@ class BottomFileExplorer(HudFrame):
     def refresh_root(self, force: bool = False) -> None:
         self._cli.runtime.sandbox.ensure_layout()
         workspace = self._cli.runtime.sandbox.workspace
-        self._root_label.setText(f"ROOT: {workspace}")
+        self._root_label.setText(f"WORKSPACE: {workspace}")
 
         if not force and self._workspace_root == workspace:
             return
@@ -789,11 +846,34 @@ class PsykerDashboard(QWidget):
                 font-weight: 700;
                 letter-spacing: 0.6px;
             }}
+            QLabel#ContextIcon, QLabel#ContextCounterIcon {{
+                min-width: 14px;
+                max-width: 14px;
+                min-height: 14px;
+                max-height: 14px;
+            }}
+            QLabel#ContextSandboxLabel {{
+                color: {colors['primary']};
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }}
             QLabel#ContextSandbox {{
                 color: {colors['text']};
+                font-size: 12px;
             }}
-            QLabel#ContextCounts {{
+            QFrame#ContextCounter {{
+                border: 1px solid {border_rgba};
+                border-radius: 6px;
+                background: {input_rgba};
+            }}
+            QLabel#ContextCounterLabel {{
+                color: {colors['muted']};
+                font-size: 11px;
+            }}
+            QLabel#ContextCounterValue {{
                 color: {colors['primary']};
+                font-weight: 700;
+                font-size: 12px;
             }}
             QLabel#PanelTitle {{
                 color: {colors['primary']};
@@ -808,6 +888,13 @@ class PsykerDashboard(QWidget):
             }}
             QLabel#ExplorerRoot {{
                 color: {colors['muted']};
+                font-size: 12px;
+            }}
+            QLabel#MetricHeader {{
+                color: {colors['muted']};
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
             }}
             QTabWidget#MonitorTabs::pane {{
                 border: 1px solid {border_rgba};
@@ -831,9 +918,12 @@ class PsykerDashboard(QWidget):
                 background: {input_rgba};
                 padding: 4px;
                 outline: none;
+                font-family: Consolas, 'JetBrains Mono', monospace;
+                font-size: 12px;
             }}
             QListWidget#MonitorList::item {{
-                padding: 3px 6px;
+                min-height: 20px;
+                padding: 2px 6px;
             }}
             QListWidget#MonitorList::item:selected {{
                 background: {colors['selected_bg']};
@@ -842,9 +932,12 @@ class PsykerDashboard(QWidget):
             QLabel#MetricLabel {{
                 color: {colors['primary']};
                 font-weight: 700;
+                font-size: 12px;
             }}
             QLabel#MetricValue {{
                 color: {colors['text']};
+                font-family: Consolas, 'JetBrains Mono', monospace;
+                font-size: 12px;
             }}
             QLabel#MetricFallback {{
                 color: {colors['muted']};
@@ -854,9 +947,12 @@ class PsykerDashboard(QWidget):
                 background: {input_rgba};
                 alternate-background-color: {list_alt_rgba};
                 padding: 4px;
+                font-family: Consolas, 'JetBrains Mono', monospace;
+                font-size: 12px;
             }}
             QTreeView#ExplorerTree::item {{
-                padding: 3px 6px;
+                min-height: 20px;
+                padding: 2px 6px;
             }}
             QTreeView#ExplorerTree::item:selected {{
                 background: {colors['selected_bg']};
