@@ -1,0 +1,4 @@
+@access { agents: [alpha], workers: [w_trusted] }
+task open_report {
+  host.open "report.pdf";
+}

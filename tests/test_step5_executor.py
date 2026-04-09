@@ -264,5 +264,135 @@ class ExecutorTests(unittest.TestCase):
         self.assertIn("startupinfo", kwargs)
 
 
+class TrustedModeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.grammar = Path("Grammar Context")
+        self.temp = tempfile.TemporaryDirectory()
+        from psyker.sandbox import Sandbox, SandboxPolicy
+        self.sandbox = Sandbox(Path(self.temp.name) / "psyker_sandbox", policy=SandboxPolicy.TRUSTED)
+        self.sandbox.ensure_layout()
+        from psyker.runtime import RuntimeState
+        self.runtime = RuntimeState(sandbox=self.sandbox)
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def _make_worker_and_agent(self, caps: list[str], worker_name: str = "w_t", agent_name: str = "a_t") -> None:
+        worker_path = Path(self.temp.name) / f"{worker_name}.psyw"
+        caps_text = "".join(f"  allow {c};\n" for c in caps)
+        worker_path.write_text(
+            f'worker {worker_name} {{\n  sandbox "{self.sandbox.root}";\n  cwd "{self.sandbox.workspace}";\n{caps_text}}}\n',
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / f"{agent_name}.psya"
+        agent_path.write_text(f"agent {agent_name} {{\n  use worker {worker_name} count = 1;\n}}\n", encoding="utf-8")
+        self.runtime.load_file(worker_path)
+        self.runtime.load_file(agent_path)
+
+    def test_host_open_blocked_in_sandbox_mode(self) -> None:
+        from psyker.sandbox import Sandbox, SandboxPolicy
+        from psyker.errors import SandboxError
+        sandbox = Sandbox(Path(self.temp.name) / "psyker_sandbox2", policy=SandboxPolicy.SANDBOX)
+        sandbox.ensure_layout()
+        from psyker.runtime import RuntimeState
+        rt = RuntimeState(sandbox=sandbox)
+        worker_path = Path(self.temp.name) / "w_hob.psyw"
+        worker_path.write_text(
+            f'worker w_hob {{\n  sandbox "{sandbox.root}";\n  cwd "{sandbox.workspace}";\n  allow host.open;\n}}\n',
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / "a_hob.psya"
+        agent_path.write_text("agent a_hob {\n  use worker w_hob count = 1;\n}\n", encoding="utf-8")
+        task_path = Path(self.temp.name) / "hob_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_hob], workers: [w_hob] }\ntask do_hob {\n  host.open "file.txt";\n}\n',
+            encoding="utf-8",
+        )
+        rt.load_file(worker_path)
+        rt.load_file(agent_path)
+        rt.load_file(task_path)
+        with self.assertRaises(SandboxError):
+            rt.run_task("a_hob", "do_hob")
+
+    def test_host_open_in_trusted_mode_calls_startfile(self) -> None:
+        self._make_worker_and_agent(["host.open"])
+        task_path = Path(self.temp.name) / "ho_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_t], workers: [w_t] }\ntask do_ho {\n  host.open "report.pdf";\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        with patch("os.startfile") as mock_sf:
+            result = self.runtime.run_task("a_t", "do_ho")
+        self.assertEqual(result.status_code, 0)
+        mock_sf.assert_called_once_with("report.pdf")
+
+    def test_exec_blocklist_blocks_system32_in_sandbox_mode(self) -> None:
+        from psyker.sandbox import Sandbox, SandboxPolicy
+        from psyker.errors import SandboxError
+        sandbox = Sandbox(Path(self.temp.name) / "psyker_sandbox3", policy=SandboxPolicy.SANDBOX)
+        sandbox.ensure_layout()
+        from psyker.runtime import RuntimeState
+        rt = RuntimeState(sandbox=sandbox)
+        worker_path = Path(self.temp.name) / "w_blk.psyw"
+        worker_path.write_text(
+            f'worker w_blk {{\n  sandbox "{sandbox.root}";\n  cwd "{sandbox.workspace}";\n  allow exec.ps;\n}}\n',
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / "a_blk.psya"
+        agent_path.write_text("agent a_blk {\n  use worker w_blk count = 1;\n}\n", encoding="utf-8")
+        task_path = Path(self.temp.name) / "blk_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_blk], workers: [w_blk] }\ntask do_blk {\n  exec.ps "Get-Item C:\\Windows\\System32";\n}\n',
+            encoding="utf-8",
+        )
+        rt.load_file(worker_path)
+        rt.load_file(agent_path)
+        rt.load_file(task_path)
+        with self.assertRaises(SandboxError):
+            rt.run_task("a_blk", "do_blk")
+
+    def test_exec_blocklist_blocks_registry_in_sandbox_mode(self) -> None:
+        from psyker.sandbox import Sandbox, SandboxPolicy
+        from psyker.errors import SandboxError
+        sandbox = Sandbox(Path(self.temp.name) / "psyker_sandbox4", policy=SandboxPolicy.SANDBOX)
+        sandbox.ensure_layout()
+        from psyker.runtime import RuntimeState
+        rt = RuntimeState(sandbox=sandbox)
+        worker_path = Path(self.temp.name) / "w_reg.psyw"
+        worker_path.write_text(
+            f'worker w_reg {{\n  sandbox "{sandbox.root}";\n  cwd "{sandbox.workspace}";\n  allow exec.ps;\n}}\n',
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / "a_reg.psya"
+        agent_path.write_text("agent a_reg {\n  use worker w_reg count = 1;\n}\n", encoding="utf-8")
+        task_path = Path(self.temp.name) / "reg_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_reg], workers: [w_reg] }\ntask do_reg {\n  exec.ps "Get-ItemProperty HKLM:\\SOFTWARE";\n}\n',
+            encoding="utf-8",
+        )
+        rt.load_file(worker_path)
+        rt.load_file(agent_path)
+        rt.load_file(task_path)
+        with self.assertRaises(SandboxError):
+            rt.run_task("a_reg", "do_reg")
+
+    def test_grammar_context_trusted_worker_parses(self) -> None:
+        from psyker.parser import parse_path
+        doc = parse_path(Path("Grammar Context/valid/worker_trusted.psyw"))
+        from psyker.model import WorkerDocument
+        self.assertIsInstance(doc, WorkerDocument)
+        self.assertEqual(doc.worker.name, "w_trusted")
+        caps = {a.capability for a in doc.worker.allows}
+        self.assertIn("host.open", caps)
+
+    def test_grammar_context_host_open_task_parses(self) -> None:
+        from psyker.parser import parse_path
+        doc = parse_path(Path("Grammar Context/valid/task_host_open.psy"))
+        from psyker.model import TaskDocument
+        self.assertIsInstance(doc, TaskDocument)
+        self.assertEqual(doc.tasks[0].statements[0].op, "host.open")
+
+
 if __name__ == "__main__":
     unittest.main()

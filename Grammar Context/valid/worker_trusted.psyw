@@ -1,0 +1,5 @@
+worker w_trusted {
+  sandbox "sandbox";
+  cwd "sandbox/workspace";
+  allow host.open;
+}
