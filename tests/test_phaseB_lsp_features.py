@@ -3,20 +3,25 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from lsprotocol.types import Position
-
 from psyker.capabilities import TASK_OPERATIONS, WORKER_CAPABILITIES
 from psyker.model import WorkerDef, WorkerDocument
-from psyker_lsp.server import (
-    OpenDocument,
-    completion_context_for_position,
-    definition_target_kind_for_position,
-    hover_text_for_word,
-    keywords_for_suffix,
-    worker_names_from_open_docs,
-)
+
+try:
+    from lsprotocol.types import Position
+    from psyker_lsp.server import (
+        OpenDocument,
+        completion_context_for_position,
+        definition_target_kind_for_position,
+        hover_text_for_word,
+        keywords_for_suffix,
+        worker_names_from_open_docs,
+    )
+    _lsp_available = True
+except ImportError:
+    _lsp_available = False
 
 
+@unittest.skipUnless(_lsp_available, "psyker_lsp / lsprotocol not installed")
 class PhaseBLspFeatureTests(unittest.TestCase):
     def test_keywords_for_suffix(self) -> None:
         self.assertEqual(

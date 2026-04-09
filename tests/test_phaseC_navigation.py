@@ -3,23 +3,27 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from lsprotocol.types import (
-    DefinitionParams,
-    DocumentSymbolParams,
-    Position,
-    TextDocumentIdentifier,
-)
+try:
+    from lsprotocol.types import (
+        DefinitionParams,
+        DocumentSymbolParams,
+        Position,
+        TextDocumentIdentifier,
+    )
+    from psyker_lsp.server import (
+        OpenDocument,
+        PsykerLanguageServer,
+        SymbolRecord,
+        WorkspaceIndex,
+        definition,
+        document_symbol,
+    )
+    _lsp_available = True
+except ImportError:
+    _lsp_available = False
 
-from psyker_lsp.server import (
-    OpenDocument,
-    PsykerLanguageServer,
-    SymbolRecord,
-    WorkspaceIndex,
-    definition,
-    document_symbol,
-)
 
-
+@unittest.skipUnless(_lsp_available, "psyker_lsp / lsprotocol not installed")
 class PhaseCNavigationTests(unittest.TestCase):
     def test_definition_jumps_to_worker_from_agent_reference(self) -> None:
         ls = PsykerLanguageServer()

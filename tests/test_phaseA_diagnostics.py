@@ -4,9 +4,15 @@ from pathlib import Path
 import unittest
 
 from psyker.errors import DialectError, SourceSpan, SyntaxError
-from psyker_lsp.server import to_lsp_diagnostic
+
+try:
+    from psyker_lsp.server import to_lsp_diagnostic
+    _lsp_available = True
+except ImportError:
+    _lsp_available = False
 
 
+@unittest.skipUnless(_lsp_available, "psyker_lsp / lsprotocol not installed")
 class PhaseADiagnosticTests(unittest.TestCase):
     def test_psyker_error_to_diagnostic_includes_hint_when_present(self) -> None:
         exc = DialectError(

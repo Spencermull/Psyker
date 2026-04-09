@@ -248,11 +248,15 @@ class CLITests(unittest.TestCase):
                 _FakeStyle.captured = style_dict
                 return "style-object"
 
+        class _FakeHistory:
+            pass
+
         with patch("sys.stdin.isatty", return_value=True):
             with patch("sys.stdout.isatty", return_value=True):
                 with patch("psyker.cli._pt_Style", new=_FakeStyle):
-                    with patch("psyker.cli._pt_prompt", side_effect=EOFError) as mocked_prompt:
-                        code = cli.run_repl()
+                    with patch("psyker.cli._pt_InMemoryHistory", new=_FakeHistory):
+                        with patch("psyker.cli._pt_prompt", side_effect=EOFError) as mocked_prompt:
+                            code = cli.run_repl()
 
         self.assertEqual(code, 0)
         self.assertEqual(mocked_prompt.call_args.args[0], [("class:prompt", PROMPT_TEXT)])
@@ -272,6 +276,9 @@ class CLITests(unittest.TestCase):
             def from_dict(style_dict: dict[str, str]) -> str:
                 return "style-object"
 
+        class _FakeHistory:
+            pass
+
         history_ids: list[int] = []
 
         def _fake_prompt(*args, **kwargs):
@@ -283,8 +290,9 @@ class CLITests(unittest.TestCase):
         with patch("sys.stdin.isatty", return_value=True):
             with patch("sys.stdout.isatty", return_value=True):
                 with patch("psyker.cli._pt_Style", new=_FakeStyle):
-                    with patch("psyker.cli._pt_prompt", side_effect=_fake_prompt):
-                        code = cli.run_repl()
+                    with patch("psyker.cli._pt_InMemoryHistory", new=_FakeHistory):
+                        with patch("psyker.cli._pt_prompt", side_effect=_fake_prompt):
+                            code = cli.run_repl()
 
         self.assertEqual(code, 0)
         self.assertGreaterEqual(len(history_ids), 2)
@@ -308,12 +316,16 @@ class CLITests(unittest.TestCase):
             def from_dict(style_dict: dict[str, str]) -> str:
                 return "style-object"
 
+        class _FakeHistory:
+            pass
+
         with patch("sys.stdin.isatty", return_value=True):
             with patch("sys.stdout.isatty", return_value=True):
                 with patch("psyker.cli._pt_Style", new=_FakeStyle):
-                    with patch("psyker.cli._pt_prompt", side_effect=RuntimeError("prompt failed")) as mocked_prompt:
-                        with patch("builtins.input", side_effect=EOFError) as mocked_input:
-                            code = cli.run_repl()
+                    with patch("psyker.cli._pt_InMemoryHistory", new=_FakeHistory):
+                        with patch("psyker.cli._pt_prompt", side_effect=RuntimeError("prompt failed")) as mocked_prompt:
+                            with patch("builtins.input", side_effect=EOFError) as mocked_input:
+                                code = cli.run_repl()
 
         self.assertEqual(code, 0)
         mocked_prompt.assert_called_once()
