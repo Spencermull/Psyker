@@ -5,6 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from .capabilities import (
+    TASK_OPERATIONS,
+    TASK_PATH_OPS,
+    TASK_PATH_PLUS_STRING_OPS,
+    TASK_STRING_OPS,
+    WORKER_CAPABILITIES,
+)
 from .errors import DialectError, SourceSpan, SyntaxError
 from .lexer import tokenize_file
 from .model import (
@@ -21,8 +28,8 @@ from .model import (
 )
 from .token import Token
 
-_TASK_OPS = {"fs.open", "fs.create", "exec.ps", "exec.cmd"}
-_WORKER_CAPS = {"fs.open", "fs.create", "exec.ps", "exec.cmd"}
+_TASK_OPS = set(TASK_OPERATIONS)
+_WORKER_CAPS = set(WORKER_CAPABILITIES)
 
 _TASK_ONLY = {"task", "@access", "agents", "workers"} | _TASK_OPS
 _WORKER_ONLY = {"worker", "allow", "sandbox", "cwd"} | _WORKER_CAPS
@@ -135,9 +142,23 @@ class Parser:
 
     def _parse_task_stmt(self) -> TaskStmt:
         op = self._expect_keyword_any(_TASK_OPS)
-        arg = self._expect_path_or_string()
+        arg: Token
+        arg2: Token | None = None
+        if op.value in TASK_STRING_OPS:
+            arg = self._expect_kind("STRING")
+        elif op.value in TASK_PATH_PLUS_STRING_OPS:
+            arg = self._expect_path_or_string()
+            arg2 = self._expect_kind("STRING")
+        elif op.value in TASK_PATH_OPS:
+            arg = self._expect_path_or_string()
+        else:
+            raise SyntaxError(
+                f"Unsupported task operation '{op.value}'",
+                self._span(op),
+                hint="Check the task operation keyword.",
+            )
         self._expect_symbol(";")
-        return TaskStmt(op=op.value, arg=arg.value, line=op.line, column=op.column)
+        return TaskStmt(op=op.value, arg=arg.value, line=op.line, column=op.column, arg2=arg2.value if arg2 else None)
 
     def _parse_worker_def(self) -> WorkerDef:
         self._expect_keyword("worker")
@@ -172,7 +193,7 @@ class Parser:
                     raise SyntaxError(
                         f"Unknown capability '{capability_token.value}'",
                         self._span(capability_token),
-                        hint="Use fs.open, fs.create, exec.ps, or exec.cmd.",
+                        hint=f"Use one of: {', '.join(sorted(_WORKER_CAPS))}.",
                     )
                 arg: Optional[str] = None
                 if self._peek().kind in {"PATH", "STRING", "IDENT"}:
@@ -351,4 +372,3 @@ class Parser:
 
     def _span(self, token: Token) -> SourceSpan:
         return SourceSpan(self.path, token.line, token.column)
-

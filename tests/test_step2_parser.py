@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 import unittest
 
 from psyker.errors import DialectError, SyntaxError
@@ -41,6 +42,26 @@ class ParserCorpusTests(unittest.TestCase):
             with self.subTest(path=path):
                 ast = parse_path(path)
                 self.assertIsNotNone(ast)
+
+    def test_extended_task_operations_parse(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "extended_ops.psy"
+            path.write_text(
+                (
+                    '@access { agents: [alpha], workers: [w1] }\n'
+                    "task ext {\n"
+                    '  fs.write "a.txt" "x";\n'
+                    '  fs.update "a.txt" "y";\n'
+                    '  fs.append "a.txt" "z";\n'
+                    '  fs.delete "a.txt";\n'
+                    '  fs.list ".";\n'
+                    "}\n"
+                ),
+                encoding="utf-8",
+            )
+            ast = parse_path(path)
+            self.assertIsInstance(ast, TaskDocument)
+            self.assertEqual(len(ast.tasks[0].statements), 5)
 
 
 if __name__ == "__main__":

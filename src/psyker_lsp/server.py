@@ -38,6 +38,7 @@ from lsprotocol.types import (
 )
 from pygls.lsp.server import LanguageServer
 
+from psyker.capabilities import TASK_OPERATIONS, WORKER_CAPABILITIES
 from psyker.errors import DialectError, PsykerError, ReferenceError, SourceSpan, SyntaxError
 from psyker.lexer import tokenize
 from psyker.model import AgentDocument, TaskDocument, WorkerDocument
@@ -45,7 +46,7 @@ from psyker.parser import Parser
 from psyker.validator import ValidationContext, validate_document
 
 SERVER_NAME = "psyker-lsp"
-SERVER_VERSION = "0.1.1"
+SERVER_VERSION = "0.1.2"
 
 _TASK_NAME_RE = re.compile(r"^\s*task\s+([A-Za-z][A-Za-z0-9_-]*)\b")
 _AGENT_NAME_RE = re.compile(r"^\s*agent\s+([A-Za-z][A-Za-z0-9_-]*)\b")
@@ -65,9 +66,9 @@ _CTX_TASK_NAME = "task_name"
 _CTX_ALLOW_CAPABILITY = "allow_capability"
 
 _KEYWORDS_BY_SUFFIX = {
-    ".psy": ["task", "@access", "agents", "workers", "fs.open", "fs.create", "exec.ps", "exec.cmd"],
+    ".psy": ["task", "@access", "agents", "workers", *TASK_OPERATIONS],
     ".psya": ["agent", "use", "worker", "count"],
-    ".psyw": ["worker", "allow", "sandbox", "cwd", "fs.open", "fs.create", "exec.ps", "exec.cmd"],
+    ".psyw": ["worker", "allow", "sandbox", "cwd", *WORKER_CAPABILITIES],
 }
 
 _HOVER_TEXT_BY_WORD = {
@@ -83,7 +84,12 @@ _HOVER_TEXT_BY_WORD = {
     "sandbox": "Worker sandbox root path. All file operations stay under this root.",
     "cwd": "Default command working directory for worker shell execution.",
     "fs.open": "Read a file from sandbox scope (requires worker allow fs.open).",
-    "fs.create": "Create/write files in sandbox scope (requires worker allow fs.create).",
+    "fs.create": "Create an empty file or directory in sandbox scope (requires worker allow fs.create).",
+    "fs.write": "Write text to a file, creating or replacing it (requires allow fs.write).",
+    "fs.update": "Overwrite an existing file's text (requires allow fs.update).",
+    "fs.append": "Append text to a file, creating it if missing (requires allow fs.append).",
+    "fs.delete": "Delete a file or directory in sandbox scope (requires allow fs.delete).",
+    "fs.list": "List directory entries in sandbox scope (requires allow fs.list).",
     "exec.ps": "Execute a PowerShell command in sandbox cwd (requires allow exec.ps).",
     "exec.cmd": "Execute a cmd command in sandbox cwd (requires allow exec.cmd).",
 }
@@ -165,7 +171,7 @@ def completion(ls: PsykerLanguageServer, params: CompletionParams) -> list[Compl
     if context == _CTX_TASK_NAME:
         return _identifier_items(task_names_from_index(index))
     if context == _CTX_ALLOW_CAPABILITY:
-        return _keyword_items(["fs.open", "fs.create", "exec.ps", "exec.cmd"])
+        return _keyword_items(list(WORKER_CAPABILITIES))
 
     return _keyword_items(keywords_for_suffix(suffix))
 

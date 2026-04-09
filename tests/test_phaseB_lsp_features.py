@@ -5,6 +5,7 @@ from pathlib import Path
 
 from lsprotocol.types import Position
 
+from psyker.capabilities import TASK_OPERATIONS, WORKER_CAPABILITIES
 from psyker.model import WorkerDef, WorkerDocument
 from psyker_lsp.server import (
     OpenDocument,
@@ -20,7 +21,7 @@ class PhaseBLspFeatureTests(unittest.TestCase):
     def test_keywords_for_suffix(self) -> None:
         self.assertEqual(
             keywords_for_suffix(".psy"),
-            ["task", "@access", "agents", "workers", "fs.open", "fs.create", "exec.ps", "exec.cmd"],
+            ["task", "@access", "agents", "workers", *TASK_OPERATIONS],
         )
         self.assertEqual(
             keywords_for_suffix(".psya"),
@@ -28,7 +29,7 @@ class PhaseBLspFeatureTests(unittest.TestCase):
         )
         self.assertEqual(
             keywords_for_suffix(".psyw"),
-            ["worker", "allow", "sandbox", "cwd", "fs.open", "fs.create", "exec.ps", "exec.cmd"],
+            ["worker", "allow", "sandbox", "cwd", *WORKER_CAPABILITIES],
         )
         self.assertEqual(keywords_for_suffix(".txt"), [])
 
@@ -63,6 +64,10 @@ class PhaseBLspFeatureTests(unittest.TestCase):
         self.assertEqual(
             hover_text_for_word("fs.open"),
             "Read a file from sandbox scope (requires worker allow fs.open).",
+        )
+        self.assertEqual(
+            hover_text_for_word("fs.write"),
+            "Write text to a file, creating or replacing it (requires allow fs.write).",
         )
         self.assertEqual(
             hover_text_for_word("@access"),

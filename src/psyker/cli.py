@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import glob
 import json
 from pathlib import Path
 import re
@@ -22,8 +23,11 @@ from .errors import (
     SandboxError,
     SyntaxError,
 )
-from .runtime import RuntimeState
+from .runtime import RuntimeState, _windows_subprocess_kwargs
 from .sandbox import Sandbox
+
+_LOADABLE_SUFFIXES = {".psy", ".psya", ".psyw"}
+_LOAD_ORDER = {".psyw": 0, ".psya": 1, ".psy": 2}
 
 
 CommandHandler = Callable[[list[str]], int]
@@ -139,7 +143,7 @@ class PsykerCLI:
             and _pt_Style is not None
             and _pt_InMemoryHistory is not None
             and self._io.supports_colors
-            and self._stream_is_tty(sys.stdin)
+            and bool(getattr(sys.stdin, "isatty", lambda: False)())
         )
 
         pt_style = None
@@ -228,7 +232,7 @@ class PsykerCLI:
         self._register(
             "load",
             self._cmd_load,
-            "load <path> | load --dir <path>",
+            "load <path|glob> | load --dir <path>",
             "Load a .psy/.psya/.psyw file or all such files in a directory.",
         )
         self._register("run", self._cmd_run, "run <agent> <task>", "Run a task through an agent.")
@@ -319,15 +323,19 @@ class PsykerCLI:
 
     def _cmd_load(self, args: list[str]) -> int:
         if len(args) == 1:
-            self._load_single_file(Path(args[0]))
+            target = args[0]
+            if glob.has_magic(target):
+                self._load_glob(target)
+            else:
+                self._load_single_file(Path(target))
             return 0
         if len(args) == 2 and args[0] == "--dir":
             self._load_directory(Path(args[1]))
             return 0
-        raise PsykerError("Usage: load <path> | load --dir <path>")
+        raise PsykerError("Usage: load <path|glob> | load --dir <path>")
 
     def _load_single_file(self, path: Path) -> None:
-        if path.suffix.lower() not in {".psy", ".psya", ".psyw"}:
+        if path.suffix.lower() not in _LOADABLE_SUFFIXES:
             raise DialectError(
                 f"Unsupported file extension '{path.suffix}'",
                 hint="Use .psy, .psya, or .psyw.",
@@ -343,16 +351,24 @@ class PsykerCLI:
         if not root.exists() or not root.is_dir():
             raise PsykerError(f"Directory not found: {directory}")
 
-        order = {".psyw": 0, ".psya": 1, ".psy": 2}
-        files = [
-            path
-            for path in root.iterdir()
-            if path.is_file() and path.suffix.lower() in order
-        ]
-        files.sort(key=lambda path: (order[path.suffix.lower()], path.name.lower()))
+        files = [path for path in root.iterdir() if path.is_file() and path.suffix.lower() in _LOADABLE_SUFFIXES]
+        files = self._sorted_load_candidates(files)
 
         for path in files:
             self._load_single_file(path)
+
+    def _load_glob(self, pattern: str) -> None:
+        matches = [Path(raw) for raw in glob.glob(pattern, recursive=True)]
+        files = [path for path in matches if path.is_file() and path.suffix.lower() in _LOADABLE_SUFFIXES]
+        files = self._sorted_load_candidates(files)
+        if not files:
+            raise PsykerError(f"No loadable files matched glob: {pattern}")
+
+        for path in files:
+            self._load_single_file(path)
+
+    def _sorted_load_candidates(self, files: list[Path]) -> list[Path]:
+        return sorted(files, key=lambda path: (_LOAD_ORDER[path.suffix.lower()], path.name.lower(), str(path).lower()))
 
     def _cmd_run(self, args: list[str]) -> int:
         if len(args) != 2:
@@ -452,36 +468,27 @@ class PsykerCLI:
     def _cmd_help(self, args: list[str]) -> int:
         if len(args) > 1:
             raise PsykerError("Usage: help [--cmds|--version|--about|<command>]")
-        if len(args) == 1 and args[0] == "--cmds":
-            rows = []
-            for name in sorted(self.commands):
-                command = self.commands[name]
-                rows.append([self._color_command(name), self._color_flags(command.usage), command.description])
+        if not args or args[0] == "--cmds":
+            rows = [
+                [self._color_command(name), self._color_flags(cmd.usage), cmd.description]
+                for name, cmd in sorted(self.commands.items())
+            ]
             self._println(_render_table(["command", "usage", "description"], rows))
             return 0
-        if len(args) == 1 and args[0] == "--version":
+        if args[0] == "--version":
             self._println(f"Psyker v{__version__}")
             return 0
-        if len(args) == 1 and args[0] == "--about":
+        if args[0] == "--about":
             self._println(f"{WELCOME_LINE}\n{WELCOME_BYLINE}")
             return 0
-        if len(args) == 1:
-            if args[0].startswith("--"):
-                raise PsykerError(
-                    f"Unknown help option '{args[0]}'. Use: help [--cmds|--version|--about|<command>]"
-                )
-            command = self.commands.get(args[0])
-            if command is None:
-                raise PsykerError(f"Unknown command '{args[0]}'")
-            name = self._color_command(args[0])
-            usage = self._color_flags(command.usage)
-            self._println(f"{name}: {command.description}\nusage: {usage}")
-            return 0
-        rows = []
-        for name in sorted(self.commands):
-            command = self.commands[name]
-            rows.append([self._color_command(name), self._color_flags(command.usage), command.description])
-        self._println(_render_table(["command", "usage", "description"], rows))
+        if args[0].startswith("--"):
+            raise PsykerError(
+                f"Unknown help option '{args[0]}'. Use: help [--cmds|--version|--about|<command>]"
+            )
+        command = self.commands.get(args[0])
+        if command is None:
+            raise PsykerError(f"Unknown command '{args[0]}'")
+        self._println(f"{self._color_command(args[0])}: {command.description}\nusage: {self._color_flags(command.usage)}")
         return 0
 
     def _cmd_exit(self, args: list[str]) -> int:
@@ -526,9 +533,6 @@ class PsykerCLI:
 
     def is_cancel_requested(self) -> bool:
         return self._cancel_requested
-
-    def _stream_is_tty(self, stream: object) -> bool:
-        return bool(getattr(stream, "isatty", lambda: False)())
 
     def _colors_enabled(self) -> bool:
         return self._io.supports_colors
@@ -602,28 +606,6 @@ def _format_value(value: object) -> str:
     return str(value)
 
 
-def _windows_subprocess_kwargs() -> dict[str, object]:
-    if sys.platform != "win32":
-        return {}
-
-    kwargs: dict[str, object] = {}
-    create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    if create_no_window:
-        kwargs["creationflags"] = create_no_window
-
-    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
-    if startupinfo_cls is None:
-        return kwargs
-
-    startupinfo = startupinfo_cls()
-    use_show_window = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
-    if use_show_window:
-        startupinfo.dwFlags |= use_show_window
-    startupinfo.wShowWindow = getattr(subprocess, "SW_HIDE", 0)
-    kwargs["startupinfo"] = startupinfo
-    return kwargs
-
-
 def _visible_len(text: str) -> int:
     return len(ANSI_PATTERN.sub("", text))
 
@@ -631,3 +613,5 @@ def _visible_len(text: str) -> int:
 def _ljust_visible(text: str, width: int) -> str:
     pad = max(width - _visible_len(text), 0)
     return text + (" " * pad)
+
+

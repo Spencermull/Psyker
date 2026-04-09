@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .capabilities import TASK_OPERATIONS
 from .errors import SourceSpan, SyntaxError
 from .token import Token
 
 _SYMBOLS = {"{", "}", "[", "]", ":", ",", ";", "="}
 _SINGLE_DIALECT_WORDS = {"task", "agent", "worker", "allow", "use", "count", "sandbox", "cwd", "agents", "workers"}
-_DOTTED_KEYWORDS = {"fs.open", "fs.create", "exec.ps", "exec.cmd"}
+_DOTTED_KEYWORDS = set(TASK_OPERATIONS)
 
 
 def tokenize(source: str, path: Path | None = None) -> list[Token]:
@@ -104,7 +105,7 @@ def tokenize(source: str, path: Path | None = None) -> list[Token]:
         if _is_path_start(ch):
             start_line, start_col = line, column
             value = advance()
-            while _is_path_part(peek()):
+            while _is_path_start(peek()):
                 value += advance()
             tokens.append(Token("PATH", value, start_line, start_col))
             continue
@@ -164,10 +165,6 @@ def _is_ident_part(ch: str) -> bool:
 
 def _is_path_start(ch: str) -> bool:
     return bool(ch) and (ch.isalpha() or ch.isdigit() or ch in {"_", "-", ".", "/", "\\", ":"})
-
-
-def _is_path_part(ch: str) -> bool:
-    return _is_path_start(ch)
 
 
 def tokenize_file(path: Path) -> list[Token]:

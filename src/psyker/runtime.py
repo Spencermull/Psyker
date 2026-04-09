@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import os
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 from typing import Callable, Dict
 
+from .capabilities import TASK_PATH_PLUS_STRING_OPS
 from .errors import AccessError, ExecError, PermissionError, ReferenceError
 from .model import AgentDef, AgentDocument, TaskDef, TaskDocument, WorkerDef, WorkerDocument
 from .parser import parse_path
@@ -78,7 +80,7 @@ class RuntimeState:
             if self._cancel_requested():
                 raise ExecError("Task cancelled by user.")
             self._enforce_capability(worker, stmt.op)
-            out, err = self._run_statement(agent_name, worker, stmt.op, stmt.arg)
+            out, err = self._run_statement(agent_name, worker, stmt.op, stmt.arg, stmt.arg2)
             if out:
                 stdout_parts.append(out)
             if err:
@@ -136,8 +138,21 @@ class RuntimeState:
                 hint="Add an allow statement in the worker definition.",
             )
 
-    def _run_statement(self, agent_name: str, worker: WorkerDef, op: str, arg: str) -> tuple[str, str]:
-        value = _dequote(arg)
+    def _run_statement(
+        self,
+        agent_name: str,
+        worker: WorkerDef,
+        op: str,
+        arg: str,
+        arg2: str | None = None,
+    ) -> tuple[str, str]:
+        value = self._sanitize_task_argument(_dequote(arg), op=op, argument_name="path_or_command")
+        text_value = None
+        if op in TASK_PATH_PLUS_STRING_OPS:
+            if arg2 is None:
+                raise ExecError(f"Missing text argument for {op}")
+            text_value = self._sanitize_task_argument(_dequote(arg2), op=op, argument_name="text")
+
         if op == "fs.open":
             target = self._resolve_task_fs_target(value)
             if not target.exists() or not target.is_file():
@@ -156,6 +171,63 @@ class RuntimeState:
                 target.mkdir(parents=True, exist_ok=True)
             self.sandbox.log(agent_name, worker.name, op, "ok")
             return "", ""
+
+        if op == "fs.write":
+            target = self._resolve_task_fs_target(value)
+            self._assert_not_directory_target(target, op)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text_value or "", encoding="utf-8")
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
+        if op == "fs.update":
+            target = self._resolve_task_fs_target(value)
+            self._assert_not_directory_target(target, op)
+            if not target.exists() or not target.is_file():
+                self.sandbox.log(agent_name, worker.name, op, "error")
+                raise ExecError(f"File not found for fs.update: {target}")
+            target.write_text(text_value or "", encoding="utf-8")
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
+        if op == "fs.append":
+            target = self._resolve_task_fs_target(value)
+            self._assert_not_directory_target(target, op)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("a", encoding="utf-8") as handle:
+                handle.write(text_value or "")
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
+        if op == "fs.delete":
+            target = self._resolve_task_fs_target(value)
+            self._assert_safe_delete_target(target)
+            if not target.exists():
+                self.sandbox.log(agent_name, worker.name, op, "error")
+                raise ExecError(f"Path not found for fs.delete: {target}")
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
+        if op == "fs.list":
+            target = self._resolve_task_fs_target(value)
+            if not target.exists() or not target.is_dir():
+                self.sandbox.log(agent_name, worker.name, op, "error")
+                raise ExecError(f"Directory not found for fs.list: {target}")
+            entries = sorted(target.iterdir(), key=lambda item: item.name.lower())
+            lines = []
+            for entry in entries:
+                try:
+                    rel = entry.relative_to(self.sandbox.workspace)
+                except ValueError:
+                    rel = entry.relative_to(self.sandbox.root)
+                text = rel.as_posix() or "."
+                lines.append(f"{text}/" if entry.is_dir() else text)
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return ("\n".join(lines) + ("\n" if lines else "")), ""
 
         if op == "exec.ps":
             return self._run_process(agent_name, worker, op, ["powershell", "-NoProfile", "-Command", value])
@@ -217,6 +289,21 @@ class RuntimeState:
             return self.sandbox.resolve_under_root(value)
         return self.sandbox.resolve_in_workspace(value)
 
+    def _assert_not_directory_target(self, target: Path, op: str) -> None:
+        if target.exists() and target.is_dir():
+            raise ExecError(f"{op} requires a file path, got directory: {target}")
+
+    def _assert_safe_delete_target(self, target: Path) -> None:
+        protected = {self.sandbox.root.resolve(), self.sandbox.workspace.resolve(), self.sandbox.logs.resolve(), self.sandbox.tmp.resolve()}
+        if target.resolve() in protected:
+            raise ExecError(f"Refusing to delete protected sandbox path: {target}")
+
+    @staticmethod
+    def _sanitize_task_argument(value: str, *, op: str, argument_name: str) -> str:
+        if "\x00" in value:
+            raise ExecError(f"Invalid {argument_name} for {op}: contains null byte")
+        return value
+
     def _cancel_requested(self) -> bool:
         try:
             return bool(self._cancel_check())
@@ -231,7 +318,7 @@ def _dequote(value: str) -> str:
 
 
 def _windows_subprocess_kwargs() -> dict[str, object]:
-    if os.name != "nt":
+    if sys.platform != "win32":
         return {}
 
     kwargs: dict[str, object] = {}

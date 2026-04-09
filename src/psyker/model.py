@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -15,10 +15,11 @@ class AccessBlock:
 
 @dataclass(frozen=True)
 class TaskStmt:
-    op: Literal["fs.open", "fs.create", "exec.ps", "exec.cmd"]
+    op: str
     arg: str
     line: int
     column: int
+    arg2: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,4 +75,3 @@ class WorkerDocument:
 @dataclass(frozen=True)
 class AgentDocument:
     agent: AgentDef
-

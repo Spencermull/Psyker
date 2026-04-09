@@ -58,6 +58,76 @@ class ExecutorTests(unittest.TestCase):
         with self.assertRaises(ExecError):
             self.runtime.run_task("alpha", "hello")
 
+    def test_fs_write_update_append_delete_and_list(self) -> None:
+        worker_path = Path(self.temp.name) / "worker_ext.psyw"
+        worker_path.write_text(
+            (
+                "worker w_ext {\n"
+                f'  sandbox "{self.sandbox.root}";\n'
+                f'  cwd "{self.sandbox.workspace}";\n'
+                "  allow fs.write;\n"
+                "  allow fs.update;\n"
+                "  allow fs.append;\n"
+                "  allow fs.delete;\n"
+                "  allow fs.list;\n"
+                "}\n"
+            ),
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / "agent_ext.psya"
+        agent_path.write_text("agent alpha_ext {\n  use worker w_ext count = 1;\n}\n", encoding="utf-8")
+
+        write_task = Path(self.temp.name) / "write_ext.psy"
+        write_task.write_text(
+            (
+                "@access { agents: [alpha_ext], workers: [w_ext] }\n"
+                "task write_ext {\n"
+                '  fs.write "notes.txt" "alpha";\n'
+                '  fs.append "notes.txt" "-beta";\n'
+                '  fs.update "notes.txt" "gamma";\n'
+                "}\n"
+            ),
+            encoding="utf-8",
+        )
+
+        list_task = Path(self.temp.name) / "list_ext.psy"
+        list_task.write_text(
+            (
+                "@access { agents: [alpha_ext], workers: [w_ext] }\n"
+                "task list_ext {\n"
+                '  fs.list ".";\n'
+                "}\n"
+            ),
+            encoding="utf-8",
+        )
+
+        delete_task = Path(self.temp.name) / "delete_ext.psy"
+        delete_task.write_text(
+            (
+                "@access { agents: [alpha_ext], workers: [w_ext] }\n"
+                "task delete_ext {\n"
+                '  fs.delete "notes.txt";\n'
+                "}\n"
+            ),
+            encoding="utf-8",
+        )
+
+        self.runtime.load_file(worker_path)
+        self.runtime.load_file(agent_path)
+        self.runtime.load_file(write_task)
+        self.runtime.load_file(list_task)
+        self.runtime.load_file(delete_task)
+
+        self.runtime.run_task("alpha_ext", "write_ext")
+        target = self.sandbox.resolve_in_workspace("notes.txt")
+        self.assertEqual(target.read_text(encoding="utf-8"), "gamma")
+
+        result = self.runtime.run_task("alpha_ext", "list_ext")
+        self.assertIn("notes.txt", result.stdout)
+
+        self.runtime.run_task("alpha_ext", "delete_ext")
+        self.assertFalse(target.exists())
+
     def test_runtime_exec_uses_hidden_windows_subprocess_when_available(self) -> None:
         if sys.platform != "win32":
             self.skipTest("Windows-specific subprocess behavior")

@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from psyker.errors import ExecError
+from psyker import __version__
 from psyker.cli import PROMPT_TEXT, PsykerCLI
 from psyker.runtime import RuntimeState
 from psyker.sandbox import Sandbox
@@ -61,6 +62,22 @@ class CLITests(unittest.TestCase):
         self.assertGreaterEqual(worker_idx, 0)
         self.assertGreater(agent_idx, worker_idx)
         self.assertGreater(task_idx, agent_idx)
+
+    def test_load_glob_loads_matching_files_in_dependency_order(self) -> None:
+        bundle = Path(self.temp.name) / "glob_bundle"
+        bundle.mkdir(parents=True, exist_ok=True)
+        worker_path = bundle / "worker_x.psyw"
+        agent_path = bundle / "agent_x.psya"
+        task_path = bundle / "task_x.psy"
+        worker_path.write_text((self.grammar / "valid" / "worker_basic.psyw").read_text(encoding="utf-8"), encoding="utf-8")
+        agent_path.write_text((self.grammar / "valid" / "agent_basic.psya").read_text(encoding="utf-8"), encoding="utf-8")
+        task_path.write_text((self.grammar / "valid" / "task_basic.psy").read_text(encoding="utf-8"), encoding="utf-8")
+
+        code = self.cli.execute_line(f'load "{bundle}/*.psy*"')
+        self.assertEqual(code, 0)
+        self.assertIn("w1", self.runtime.workers)
+        self.assertIn("alpha", self.runtime.agents)
+        self.assertIn("hello", self.runtime.tasks)
 
     def test_verbose_mode_logs_load_path_to_stderr(self) -> None:
         cli = PsykerCLI(self.runtime, out=self.out, err=self.err, verbose=True)
@@ -173,7 +190,7 @@ class CLITests(unittest.TestCase):
             code = self.cli.run_repl()
         self.assertEqual(code, 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.1 - DSL runtime for terminal automation", output)
+        self.assertIn(f"Psyker v{__version__} - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
         self.assertIn("____  _____ __  __ _____ ______", output)
         self.assertIn("/ ____/___/ /  / /  ___/ / /___", output)
@@ -208,12 +225,12 @@ class CLITests(unittest.TestCase):
 
     def test_help_version(self) -> None:
         self.assertEqual(self.cli.execute_line("help --version"), 0)
-        self.assertIn("Psyker v0.1.1", self.out.getvalue())
+        self.assertIn(f"Psyker v{__version__}", self.out.getvalue())
 
     def test_help_about(self) -> None:
         self.assertEqual(self.cli.execute_line("help --about"), 0)
         output = self.out.getvalue()
-        self.assertIn("Psyker v0.1.1 - DSL runtime for terminal automation", output)
+        self.assertIn(f"Psyker v{__version__} - DSL runtime for terminal automation", output)
         self.assertIn("By Spencer Muller", output)
 
     def test_help_unknown_option_is_clear_error(self) -> None:

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-18
+
+### Added
+
+- DSL/runtime: added `fs.write`, `fs.update`, `fs.append`, `fs.delete`, and `fs.list` task operations with worker capability enforcement.
+- Runtime: added filesystem safety checks for new operations (sandbox-bound deletes, null-byte argument rejection).
+- CLI: added glob support to `load` (example: `load "bundle/*.psy*"`), with deterministic dependency load ordering.
+- LSP: added completion/keyword/hover support for new `fs.*` capabilities.
+
 ## [0.1.1] - 2026-02-15
 
 ### Added

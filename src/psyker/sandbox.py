@@ -84,11 +84,8 @@ class Sandbox:
         self.ensure_layout()
         timestamp = datetime.now(timezone.utc).isoformat()
         line = f"{timestamp}\tagent={agent}\tworker={worker}\top={operation}\tstatus={status}\n"
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        self.log_file.write_text(
-            (self.log_file.read_text(encoding="utf-8") if self.log_file.exists() else "") + line,
-            encoding="utf-8",
-        )
+        with self.log_file.open("a", encoding="utf-8") as f:
+            f.write(line)
 
     def _assert_inside_root(self, resolved: Path) -> None:
         root_resolved = self.root.resolve()
