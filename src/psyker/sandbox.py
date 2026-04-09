@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 import os
 from pathlib import Path
 import shutil
 
 from .errors import SandboxError
+
+
+class SandboxPolicy(Enum):
+    """Execution policy for the sandbox.
+
+    SANDBOX (default): all file paths must resolve inside the sandbox root.
+        host.open and System32/registry exec commands are blocked.
+    TRUSTED: host paths are allowed; host.open opens files via OS default app.
+    """
+    SANDBOX = "sandbox"
+    TRUSTED = "trusted"
 
 
 def default_sandbox_root() -> Path:
@@ -22,6 +34,7 @@ def default_sandbox_root() -> Path:
 @dataclass
 class Sandbox:
     root: Path
+    policy: SandboxPolicy = field(default=SandboxPolicy.SANDBOX)
 
     @classmethod
     def create_default(cls) -> "Sandbox":
@@ -57,7 +70,8 @@ class Sandbox:
             resolved = candidate.resolve()
         else:
             resolved = (self.root / candidate).resolve()
-        self._assert_inside_root(resolved)
+        if self.policy == SandboxPolicy.SANDBOX:
+            self._assert_inside_root(resolved)
         return resolved
 
     def resolve_in_workspace(self, path_value: str) -> Path:
@@ -67,7 +81,8 @@ class Sandbox:
             resolved = candidate.resolve()
         else:
             resolved = (self.workspace / candidate).resolve()
-        self._assert_inside_root(resolved)
+        if self.policy == SandboxPolicy.SANDBOX:
+            self._assert_inside_root(resolved)
         return resolved
 
     def reset(self, clear_logs: bool = False) -> None:
