@@ -9,11 +9,11 @@ import subprocess
 import sys
 from typing import Callable, Dict
 
-from .capabilities import TASK_PATH_PLUS_STRING_OPS
-from .errors import AccessError, ExecError, PermissionError, ReferenceError
+from .capabilities import EXEC_SANDBOX_BLOCKED, TASK_PATH_PLUS_STRING_OPS
+from .sandbox import Sandbox, SandboxPolicy
+from .errors import AccessError, ExecError, PermissionError, ReferenceError, SandboxError
 from .model import AgentDef, AgentDocument, BatchDef, TaskDef, TaskDocument, WorkerDef, WorkerDocument
 from .parser import parse_path
-from .sandbox import Sandbox
 from .validator import ValidationContext, validate_document
 
 
@@ -271,6 +271,23 @@ class RuntimeState:
             self.sandbox.log(agent_name, worker.name, op, "ok")
             return "", ""
 
+        if op == "host.open":
+            if self.sandbox.policy == SandboxPolicy.SANDBOX:
+                raise SandboxError(
+                    "host.open is not permitted in sandbox mode",
+                    hint="Switch to trusted mode (SandboxPolicy.TRUSTED) to open host files.",
+                )
+            import os as _os
+            try:
+                _os.startfile(value)  # type: ignore[attr-defined]
+            except AttributeError:
+                # Non-Windows: fall back to xdg-open / open
+                import subprocess as _sp
+                opener = "open" if sys.platform == "darwin" else "xdg-open"
+                _sp.Popen([opener, value])
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
         if op == "exec.ps":
             return self._run_process(agent_name, worker, op, ["powershell", "-NoProfile", "-Command", value])
         if op == "exec.cmd":
@@ -279,6 +296,15 @@ class RuntimeState:
         raise ExecError(f"Unsupported operation '{op}'")
 
     def _run_process(self, agent_name: str, worker: WorkerDef, op: str, command: list[str]) -> tuple[str, str]:
+        if self.sandbox.policy == SandboxPolicy.SANDBOX:
+            cmd_str = command[-1] if command else ""
+            cmd_lower = cmd_str.lower()
+            for pattern in EXEC_SANDBOX_BLOCKED:
+                if pattern.lower() in cmd_lower:
+                    raise SandboxError(
+                        f"{op} command references blocked path or registry key: '{pattern}'",
+                        hint="Remove references to System32, SysWOW64, or registry hives in sandbox mode.",
+                    )
         cwd = self.sandbox.workspace
         if worker.cwd:
             cwd = self.sandbox.resolve_under_root(_dequote(worker.cwd))

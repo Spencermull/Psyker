@@ -77,7 +77,7 @@ def tokenize(source: str, path: Path | None = None) -> list[Token]:
             value = advance()
             while _is_ident_part(peek()):
                 value += advance()
-            if peek() == "." and value in {"fs", "exec"}:
+            if peek() == "." and value in {"fs", "exec", "host"}:
                 value += advance()
                 if not _is_ident_start(peek()):
                     raise SyntaxError(
