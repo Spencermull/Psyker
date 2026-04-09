@@ -27,8 +27,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="psyker")
     parser.add_argument("--gui", action="store_true", help="Launch GUI instead of CLI")
     parser.add_argument(
-        "-v",
-        "--verbose",
+        "-v", "--verbose",
         action="store_true",
         help="Enable troubleshooting logs to stderr",
     )
@@ -41,6 +40,20 @@ def _parse_args() -> argparse.Namespace:
         "--check-updates",
         action="store_true",
         help="Check once at startup for a newer Psyker version",
+    )
+    parser.add_argument(
+        "--script",
+        metavar="FILE",
+        help="Load a .psy/.psya/.psyw file before starting (can be repeated)",
+        action="append",
+        default=[],
+    )
+    parser.add_argument(
+        "--run",
+        metavar="AGENT:TASK",
+        help="Run a task non-interactively after loading scripts (format: agent:task). Can be repeated.",
+        action="append",
+        default=[],
     )
     args, _ = parser.parse_known_args()
     return args
@@ -73,8 +86,29 @@ def run() -> int:
         return 0
     if args.gui:
         return run_gui(verbose=args.verbose, check_updates=args.check_updates)
+
     cli = create_default_cli(verbose=args.verbose)
     _ensure_launch_working_directory(cli.runtime.sandbox)
     if args.check_updates:
         start_async_update_check(__version__, cli._io.write_error)
+
+    # Load any --script files in order
+    for script_path in getattr(args, "script", []):
+        code = cli.execute_line(f'load "{script_path}"')
+        if code != 0:
+            return code
+
+    # If --run targets provided, execute non-interactively and exit
+    if getattr(args, "run", []):
+        last_code = 0
+        for run_target in getattr(args, "run", []):
+            if ":" not in run_target:
+                cli._io.write_error(f"error[CliArgs]: --run expects 'agent:task', got '{run_target}'")
+                return 1
+            agent, task = run_target.split(":", 1)
+            last_code = cli.execute_line(f"run {agent} {task}")
+            if last_code != 0:
+                return last_code
+        return last_code
+
     return cli.run_repl()

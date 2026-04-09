@@ -9,7 +9,7 @@ from .errors import SourceSpan, SyntaxError
 from .token import Token
 
 _SYMBOLS = {"{", "}", "[", "]", ":", ",", ";", "="}
-_SINGLE_DIALECT_WORDS = {"task", "agent", "worker", "allow", "use", "count", "sandbox", "cwd", "agents", "workers"}
+_SINGLE_DIALECT_WORDS = {"task", "agent", "worker", "allow", "use", "count", "sandbox", "cwd", "agents", "workers", "batch", "run", "after"}
 _DOTTED_KEYWORDS = set(TASK_OPERATIONS)
 
 
@@ -164,7 +164,7 @@ def _is_ident_part(ch: str) -> bool:
 
 
 def _is_path_start(ch: str) -> bool:
-    return bool(ch) and (ch.isalpha() or ch.isdigit() or ch in {"_", "-", ".", "/", "\\", ":"})
+    return bool(ch) and (ch.isalpha() or ch.isdigit() or ch in {"_", "-", ".", "/", "\\", ":", "$"})
 
 
 def tokenize_file(path: Path) -> list[Token]:

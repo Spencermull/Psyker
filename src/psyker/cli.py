@@ -235,7 +235,9 @@ class PsykerCLI:
             "load <path|glob> | load --dir <path>",
             "Load a .psy/.psya/.psyw file or all such files in a directory.",
         )
-        self._register("run", self._cmd_run, "run <agent> <task>", "Run a task through an agent.")
+        self._register("run", self._cmd_run, "run <agent> <task> [task2 ...]", "Run one or more tasks through an agent (fail-fast).")
+        if _batch_feature_enabled():
+            self._register("batch", self._cmd_batch, "batch <agent> <batch_name>", "Run a batch block through an agent.")
         self._register("open", self._cmd_open, "open <path>", "Print file contents from sandbox workspace.")
         self._register("mkfile", self._cmd_mkfile, "mkfile <path>", "Create a file in sandbox workspace.")
         self._register("mkdir", self._cmd_mkdir, "mkdir <path>", "Create a directory in sandbox workspace.")
@@ -260,8 +262,14 @@ class PsykerCLI:
         self.commands[verb] = CommandDef(handler=handler, usage=usage, description=description)
 
     def _cmd_ls(self, args: list[str]) -> int:
-        if len(args) != 1 or args[0] not in {"workers", "agents", "tasks"}:
-            raise PsykerError("Usage: ls workers|agents|tasks")
+        valid_targets = {"workers", "agents", "tasks"}
+        if _batch_feature_enabled():
+            valid_targets.add("batches")
+        if len(args) != 1 or args[0] not in valid_targets:
+            usage = "ls workers|agents|tasks"
+            if _batch_feature_enabled():
+                usage += "|batches"
+            raise PsykerError(f"Usage: {usage}")
         target = args[0]
         if target == "workers":
             rows = [
@@ -276,6 +284,13 @@ class PsykerCLI:
                 count = sum(item.count for item in agent.uses)
                 rows.append([name, "agent", str(count)])
             self._println(_render_table(["name", "type", "worker_instances"], rows))
+            return 0
+        if target == "batches":
+            rows = [
+                [name, "batch", str(len(batch.steps))]
+                for name, batch in sorted(self.runtime.batches.items())
+            ]
+            self._println(_render_table(["name", "type", "steps"], rows))
             return 0
         rows = []
         for name, task in sorted(self.runtime.tasks.items()):
@@ -371,24 +386,44 @@ class PsykerCLI:
         return sorted(files, key=lambda path: (_LOAD_ORDER[path.suffix.lower()], path.name.lower(), str(path).lower()))
 
     def _cmd_run(self, args: list[str]) -> int:
-        if len(args) != 2:
-            raise PsykerError("Usage: run <agent> <task>")
+        if len(args) < 2:
+            raise PsykerError("Usage: run <agent> <task> [task2 ...]")
+        agent_name = args[0]
+        task_names = args[1:]
         self.clear_cancel()
-        self._vprintln(f"run agent={args[0]} task={args[1]}")
-        try:
-            result = self.runtime.run_task(args[0], args[1])
-        except ExecError as exc:
-            if exc.message.lower().startswith("task cancelled by user"):
-                self._println("task cancelled")
-                return 130
-            raise
-        if result.stdout:
-            self._println(result.stdout.rstrip("\n"))
-        if result.stderr:
-            self._eprintln(result.stderr.rstrip("\n"))
-        self._vprintln(f"run result status={result.status_code} worker={result.worker}")
-        self._println(f"status={result.status_code} agent={result.agent} worker={result.worker} task={result.task}")
-        return result.status_code
+        for task_name in task_names:
+            self._vprintln(f"run agent={agent_name} task={task_name}")
+            try:
+                result = self.runtime.run_task(agent_name, task_name)
+            except ExecError as exc:
+                if exc.message.lower().startswith("task cancelled by user"):
+                    self._println("task cancelled")
+                    return 130
+                raise
+            if result.stdout:
+                self._println(result.stdout.rstrip("\n"))
+            if result.stderr:
+                self._eprintln(result.stderr.rstrip("\n"))
+            self._vprintln(f"run result status={result.status_code} worker={result.worker}")
+            self._println(f"status={result.status_code} agent={result.agent} worker={result.worker} task={result.task}")
+            if result.status_code != 0:
+                return result.status_code
+        return 0
+
+    def _cmd_batch(self, args: list[str]) -> int:
+        if len(args) != 2:
+            raise PsykerError("Usage: batch <agent> <batch_name>")
+        agent_name, batch_name = args
+        self.clear_cancel()
+        self._vprintln(f"batch agent={agent_name} batch={batch_name}")
+        results = self.runtime.run_batch(agent_name, batch_name)
+        for result in results:
+            if result.stdout:
+                self._println(result.stdout.rstrip("\n"))
+            if result.stderr:
+                self._eprintln(result.stderr.rstrip("\n"))
+            self._println(f"status={result.status_code} agent={result.agent} worker={result.worker} task={result.task}")
+        return 0
 
     def _cmd_open(self, args: list[str]) -> int:
         if len(args) != 1:
@@ -613,5 +648,10 @@ def _visible_len(text: str) -> int:
 def _ljust_visible(text: str, width: int) -> str:
     pad = max(width - _visible_len(text), 0)
     return text + (" " * pad)
+
+
+def _batch_feature_enabled() -> bool:
+    import os
+    return os.environ.get("PSYKER_FEATURE_BATCH", "").strip().lower() in {"1", "true", "yes"}
 
 

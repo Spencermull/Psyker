@@ -10,6 +10,7 @@ TASK_OPERATIONS: tuple[str, ...] = (
     "fs.append",
     "fs.delete",
     "fs.list",
+    "fs.mkdir",
     "exec.ps",
     "exec.cmd",
 )
@@ -22,6 +23,7 @@ TASK_PATH_OPS: frozenset[str] = frozenset(
         "fs.create",
         "fs.delete",
         "fs.list",
+        "fs.mkdir",
     }
 )
 

@@ -19,6 +19,8 @@ from .model import (
     AgentDef,
     AgentDocument,
     AgentUse,
+    BatchDef,
+    BatchStep,
     TaskDef,
     TaskDocument,
     TaskStmt,
@@ -31,7 +33,7 @@ from .token import Token
 _TASK_OPS = set(TASK_OPERATIONS)
 _WORKER_CAPS = set(WORKER_CAPABILITIES)
 
-_TASK_ONLY = {"task", "@access", "agents", "workers"} | _TASK_OPS
+_TASK_ONLY = {"task", "batch", "run", "after", "@access", "agents", "workers"} | _TASK_OPS
 _WORKER_ONLY = {"worker", "allow", "sandbox", "cwd"} | _WORKER_CAPS
 _AGENT_ONLY = {"agent", "use", "count"}
 
@@ -59,13 +61,21 @@ class Parser:
         self.index = 0
 
     def parse_task_file(self) -> TaskDocument:
+        import os
+        batch_enabled = os.environ.get("PSYKER_FEATURE_BATCH", "").strip().lower() in {"1", "true", "yes"}
         tasks: list[TaskDef] = []
+        batches: list[BatchDef] = []
         while not self._at_end():
             if self._match("COMMENT"):
                 continue
             self._reject_cross_dialect({"worker", "agent"}, "task files (.psy)")
-            tasks.append(self._parse_task_def())
-        return TaskDocument(tasks=tuple(tasks))
+            if batch_enabled and self._peek_value() == "batch":
+                batches.append(self._parse_batch_def())
+            elif batch_enabled and self._peek_value() in {"@access"} and self._peek_ahead_for_batch():
+                batches.append(self._parse_batch_def())
+            else:
+                tasks.append(self._parse_task_def())
+        return TaskDocument(tasks=tuple(tasks), batches=tuple(batches))
 
     def parse_worker_file(self) -> WorkerDocument:
         self._skip_comments()
@@ -100,6 +110,56 @@ class Parser:
             statements.append(self._parse_task_stmt())
             self._skip_comments()
         return TaskDef(name=name.value, access=access, statements=tuple(statements), source_path=self.path)
+
+    def _peek_ahead_for_batch(self) -> bool:
+        """Look past an optional @access block to see if 'batch' follows."""
+        idx = self.index
+        # skip @access { ... }
+        if idx < len(self.tokens) and self.tokens[idx].value == "@access":
+            depth = 0
+            idx += 1
+            while idx < len(self.tokens):
+                if self.tokens[idx].value == "{":
+                    depth += 1
+                elif self.tokens[idx].value == "}":
+                    depth -= 1
+                    if depth == 0:
+                        idx += 1
+                        break
+                idx += 1
+        # skip comments
+        while idx < len(self.tokens) and self.tokens[idx].kind == "COMMENT":
+            idx += 1
+        return idx < len(self.tokens) and self.tokens[idx].value == "batch"
+
+    def _parse_batch_def(self) -> BatchDef:
+        access = None
+        if self._match_keyword("@access"):
+            access = self._parse_access_block()
+        self._expect_keyword("batch")
+        name = self._expect_ident()
+        self._expect_symbol("{")
+        steps: list[BatchStep] = []
+        while not self._match_symbol("}"):
+            self._skip_comments()
+            if self._peek_value() == "}":
+                self._advance()
+                break
+            run_token = self._expect_keyword("run")
+            task_name_token = self._expect_ident()
+            after: Optional[str] = None
+            if self._peek_value() == "after":
+                self._advance()  # consume "after"
+                after = self._expect_ident().value
+            self._expect_symbol(";")
+            steps.append(BatchStep(
+                task_name=task_name_token.value,
+                after=after,
+                line=run_token.line,
+                column=run_token.column,
+            ))
+            self._skip_comments()
+        return BatchDef(name=name.value, access=access, steps=tuple(steps), source_path=self.path)
 
     def _parse_access_block(self) -> AccessBlock:
         self._expect_symbol("{")

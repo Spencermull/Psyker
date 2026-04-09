@@ -320,5 +320,142 @@ class CLITests(unittest.TestCase):
         mocked_input.assert_called_once_with(PROMPT_TEXT)
 
 
+class CLIv013Tests(unittest.TestCase):
+    """Tests for v0.1.3 features: batch run, fs.mkdir via CLI, --script mode."""
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.sandbox = Sandbox(Path(self.temp.name) / "psyker_sandbox")
+        self.sandbox.ensure_layout()
+        self.runtime = RuntimeState(sandbox=self.sandbox)
+        self.out = io.StringIO()
+        self.err = io.StringIO()
+        self.cli = PsykerCLI(self.runtime, out=self.out, err=self.err)
+        self.grammar = Path("Grammar Context")
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def _load_basic(self) -> None:
+        self.cli.execute_line(f'load "{self.grammar / "valid" / "worker_basic.psyw"}"')
+        self.cli.execute_line(f'load "{self.grammar / "valid" / "agent_basic.psya"}"')
+
+    def _write_task(self, name: str, body: str, caps: list[str] | None = None) -> Path:
+        """Write a .psy task file to temp dir and return path."""
+        task_path = Path(self.temp.name) / f"{name}.psy"
+        task_path.write_text(
+            f"@access {{ agents: [alpha], workers: [w1] }}\ntask {name} {{\n  {body}\n}}\n",
+            encoding="utf-8",
+        )
+        return task_path
+
+    def test_run_multiple_tasks_in_order(self) -> None:
+        self._load_basic()
+        # Use fs.open for both tasks since w1 only allows fs.open / exec.ps
+        input_file = self.sandbox.workspace / "input.txt"
+        input_file.write_text("hi", encoding="utf-8")
+        t1 = self._write_task("multi1", 'fs.open "input.txt";')
+        t2_path = Path(self.temp.name) / "multi2.psy"
+        t2_path.write_text(
+            '@access { agents: [alpha], workers: [w1] }\ntask multi2 {\n  fs.open "input.txt";\n}\n',
+            encoding="utf-8",
+        )
+        self.cli.execute_line(f'load "{t1}"')
+        self.cli.execute_line(f'load "{t2_path}"')
+        code = self.cli.execute_line("run alpha multi1 multi2")
+        self.assertEqual(code, 0)
+        out = self.out.getvalue()
+        self.assertIn("task=multi1", out)
+        self.assertIn("task=multi2", out)
+
+    def test_run_batch_stops_on_first_failure(self) -> None:
+        self._load_basic()
+        t1 = self._write_task("fail_task", 'fs.open "missing_file.txt";')
+        t2 = self._write_task("after_fail", 'fs.create "should_not_exist";')
+        self.cli.execute_line(f'load "{t1}"')
+        self.cli.execute_line(f'load "{t2}"')
+        code = self.cli.execute_line("run alpha fail_task after_fail")
+        self.assertNotEqual(code, 0)
+        self.assertFalse((self.sandbox.workspace / "should_not_exist").exists())
+
+    def test_run_requires_at_least_two_args(self) -> None:
+        code = self.cli.execute_line("run alpha")
+        self.assertEqual(code, 1)
+        self.assertIn("Usage", self.err.getvalue())
+
+    def test_batch_cli_command_gated_by_feature_flag(self) -> None:
+        import os
+        # Without flag, 'batch' command should not be registered
+        self.assertNotIn("batch", self.cli.commands)
+        # With flag, it should be present
+        with patch.dict(os.environ, {"PSYKER_FEATURE_BATCH": "1"}):
+            rt = RuntimeState(sandbox=self.sandbox)
+            cli2 = PsykerCLI(rt, out=io.StringIO(), err=io.StringIO())
+            self.assertIn("batch", cli2.commands)
+
+    def test_batch_command_runs_steps(self) -> None:
+        import os
+        # Use fs.open since w1 only allows fs.open / exec.ps
+        input_file = self.sandbox.workspace / "input.txt"
+        input_file.write_text("batch-test", encoding="utf-8")
+        t1 = Path(self.temp.name) / "bs1.psy"
+        t1.write_text(
+            '@access { agents: [alpha], workers: [w1] }\ntask bs1 {\n  fs.open "input.txt";\n}\n',
+            encoding="utf-8",
+        )
+        batch_file = Path(self.temp.name) / "mybatch.psy"
+        batch_file.write_text(
+            '@access { agents: [alpha], workers: [w1] }\nbatch bp {\n  run bs1;\n}\n',
+            encoding="utf-8",
+        )
+        with patch.dict(os.environ, {"PSYKER_FEATURE_BATCH": "1"}):
+            rt = RuntimeState(sandbox=self.sandbox)
+            rt.load_file(self.grammar / "valid" / "worker_basic.psyw")
+            rt.load_file(self.grammar / "valid" / "agent_basic.psya")
+            rt.load_file(t1)
+            rt.load_file(batch_file)
+            out2 = io.StringIO()
+            err2 = io.StringIO()
+            cli2 = PsykerCLI(rt, out=out2, err=err2)
+            code = cli2.execute_line("batch alpha bp")
+        self.assertEqual(code, 0)
+        self.assertIn("bs1", out2.getvalue())
+
+    def test_script_mode_loads_file_before_repl(self) -> None:
+        from psyker.entry import run
+        wpath = str(self.grammar / "valid" / "worker_basic.psyw")
+        with patch("psyker.entry._parse_args") as mock_args:
+            import types
+            mock_args.return_value = types.SimpleNamespace(
+                version=False, gui=False, verbose=False, check_updates=False,
+                script=[wpath], run=[],
+            )
+            with patch("psyker.entry.create_default_cli") as mock_cli_factory:
+                mock_cli = mock_cli_factory.return_value
+                mock_cli.execute_line.return_value = 0
+                mock_cli.run_repl.return_value = 0
+                mock_cli._io = io.StringIO()
+                run()
+            mock_cli.execute_line.assert_any_call(f'load "{wpath}"')
+            mock_cli.run_repl.assert_called_once()
+
+    def test_run_flag_exits_without_repl(self) -> None:
+        from psyker.entry import run
+        wpath = str(self.grammar / "valid" / "worker_basic.psyw")
+        with patch("psyker.entry._parse_args") as mock_args:
+            import types
+            mock_args.return_value = types.SimpleNamespace(
+                version=False, gui=False, verbose=False, check_updates=False,
+                script=[wpath], run=["myagent:mytask"],
+            )
+            with patch("psyker.entry.create_default_cli") as mock_cli_factory:
+                mock_cli = mock_cli_factory.return_value
+                mock_cli.execute_line.return_value = 0
+                mock_cli._io = io.StringIO()
+                run()
+            mock_cli.run_repl.assert_not_called()
+            mock_cli.execute_line.assert_any_call("run myagent mytask")
+
+
 if __name__ == "__main__":
     unittest.main()

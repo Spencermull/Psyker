@@ -63,8 +63,25 @@ class AgentDef:
 
 
 @dataclass(frozen=True)
+class BatchStep:
+    task_name: str
+    after: Optional[str]
+    line: int
+    column: int
+
+
+@dataclass(frozen=True)
+class BatchDef:
+    name: str
+    access: Optional[AccessBlock]
+    steps: tuple[BatchStep, ...]
+    source_path: Optional[Path]
+
+
+@dataclass(frozen=True)
 class TaskDocument:
     tasks: tuple[TaskDef, ...] = ()
+    batches: tuple[BatchDef, ...] = ()
 
 
 @dataclass(frozen=True)

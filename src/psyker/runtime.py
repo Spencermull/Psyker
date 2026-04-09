@@ -11,7 +11,7 @@ from typing import Callable, Dict
 
 from .capabilities import TASK_PATH_PLUS_STRING_OPS
 from .errors import AccessError, ExecError, PermissionError, ReferenceError
-from .model import AgentDef, AgentDocument, TaskDef, TaskDocument, WorkerDef, WorkerDocument
+from .model import AgentDef, AgentDocument, BatchDef, TaskDef, TaskDocument, WorkerDef, WorkerDocument
 from .parser import parse_path
 from .sandbox import Sandbox
 from .validator import ValidationContext, validate_document
@@ -33,6 +33,7 @@ class RuntimeState:
     workers: Dict[str, WorkerDef] = field(default_factory=dict)
     agents: Dict[str, AgentDef] = field(default_factory=dict)
     tasks: Dict[str, TaskDef] = field(default_factory=dict)
+    batches: Dict[str, BatchDef] = field(default_factory=dict)
     _rr_index: Dict[str, int] = field(default_factory=dict)
     _cancel_check: Callable[[], bool] = field(default=lambda: False, repr=False)
 
@@ -48,6 +49,8 @@ class RuntimeState:
         context = ValidationContext(workers=workers_copy, agents=agents_copy, tasks=tasks_copy)
         validate_document(document, context)
 
+        batches_copy = dict(self.batches)
+
         if isinstance(document, WorkerDocument):
             workers_copy[document.worker.name] = document.worker
         elif isinstance(document, AgentDocument):
@@ -55,12 +58,15 @@ class RuntimeState:
         elif isinstance(document, TaskDocument):
             for task in document.tasks:
                 tasks_copy[task.name] = task
+            for batch in document.batches:
+                batches_copy[batch.name] = batch
         else:
             raise TypeError(f"Unknown document type: {type(document)!r}")
 
         self.workers = workers_copy
         self.agents = agents_copy
         self.tasks = tasks_copy
+        self.batches = batches_copy
         return document
 
     def run_task(self, agent_name: str, task_name: str) -> ExecutionResult:
@@ -94,6 +100,36 @@ class RuntimeState:
             agent=agent_name,
             task=task_name,
         )
+
+    def run_batch(self, agent_name: str, batch_name: str) -> list[ExecutionResult]:
+        agent = self.agents.get(agent_name)
+        if agent is None:
+            raise ReferenceError(f"Unknown agent '{agent_name}'", hint="Load agent files before running.")
+        batch = self.batches.get(batch_name)
+        if batch is None:
+            raise ReferenceError(f"Unknown batch '{batch_name}'", hint="Load task files before running.")
+
+        # Validate all referenced task names exist and after-references are valid
+        step_names = {step.task_name for step in batch.steps}
+        for step in batch.steps:
+            if step.task_name not in self.tasks:
+                raise ReferenceError(
+                    f"Batch '{batch_name}' references unknown task '{step.task_name}'",
+                    hint="Load the task file before running this batch.",
+                )
+            if step.after is not None and step.after not in step_names:
+                raise ReferenceError(
+                    f"Batch '{batch_name}' step '{step.task_name}' references unknown after-task '{step.after}'",
+                    hint="Ensure the referenced task is also a step in this batch.",
+                )
+
+        results: list[ExecutionResult] = []
+        for step in batch.steps:
+            if self._cancel_requested():
+                raise ExecError("Batch cancelled by user.")
+            result = self.run_task(agent_name, step.task_name)
+            results.append(result)
+        return results
 
     def _select_worker(self, agent_name: str, agent: AgentDef) -> WorkerDef:
         pool: list[str] = []
@@ -229,6 +265,12 @@ class RuntimeState:
             self.sandbox.log(agent_name, worker.name, op, "ok")
             return ("\n".join(lines) + ("\n" if lines else "")), ""
 
+        if op == "fs.mkdir":
+            target = self._resolve_task_fs_target(value)
+            target.mkdir(parents=True, exist_ok=True)
+            self.sandbox.log(agent_name, worker.name, op, "ok")
+            return "", ""
+
         if op == "exec.ps":
             return self._run_process(agent_name, worker, op, ["powershell", "-NoProfile", "-Command", value])
         if op == "exec.cmd":
@@ -284,10 +326,11 @@ class RuntimeState:
         return stdout, stderr
 
     def _resolve_task_fs_target(self, value: str) -> Path:
-        candidate = Path(value)
+        expanded = _expand_path_vars(value, self.sandbox)
+        candidate = Path(expanded)
         if candidate.is_absolute():
-            return self.sandbox.resolve_under_root(value)
-        return self.sandbox.resolve_in_workspace(value)
+            return self.sandbox.resolve_under_root(expanded)
+        return self.sandbox.resolve_in_workspace(expanded)
 
     def _assert_not_directory_target(self, target: Path, op: str) -> None:
         if target.exists() and target.is_dir():
@@ -309,6 +352,15 @@ class RuntimeState:
             return bool(self._cancel_check())
         except Exception:
             return False
+
+
+def _expand_path_vars(value: str, sandbox: "Sandbox") -> str:
+    """Replace $WORKSPACE and $SANDBOX with their sandbox paths."""
+    if "$" not in value:
+        return value
+    value = value.replace("$WORKSPACE", str(sandbox.workspace))
+    value = value.replace("$SANDBOX", str(sandbox.root))
+    return value
 
 
 def _dequote(value: str) -> str:

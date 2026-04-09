@@ -128,6 +128,116 @@ class ExecutorTests(unittest.TestCase):
         self.runtime.run_task("alpha_ext", "delete_ext")
         self.assertFalse(target.exists())
 
+    def _make_worker_and_agent(self, caps: list[str], worker_name: str = "w_ext", agent_name: str = "a_ext") -> tuple[Path, Path]:
+        worker_path = Path(self.temp.name) / f"{worker_name}.psyw"
+        caps_text = "".join(f"  allow {c};\n" for c in caps)
+        worker_path.write_text(
+            f'worker {worker_name} {{\n  sandbox "{self.sandbox.root}";\n  cwd "{self.sandbox.workspace}";\n{caps_text}}}\n',
+            encoding="utf-8",
+        )
+        agent_path = Path(self.temp.name) / f"{agent_name}.psya"
+        agent_path.write_text(f"agent {agent_name} {{\n  use worker {worker_name} count = 1;\n}}\n", encoding="utf-8")
+        self.runtime.load_file(worker_path)
+        self.runtime.load_file(agent_path)
+        return worker_path, agent_path
+
+    def test_fs_mkdir_creates_directory(self) -> None:
+        self._make_worker_and_agent(["fs.mkdir"], "w_mkdir", "a_mkdir")
+        task_path = Path(self.temp.name) / "mkdir_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_mkdir], workers: [w_mkdir] }\ntask do_mkdir {\n  fs.mkdir "newdir";\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        self.runtime.run_task("a_mkdir", "do_mkdir")
+        self.assertTrue((self.sandbox.workspace / "newdir").is_dir())
+
+    def test_fs_mkdir_is_idempotent(self) -> None:
+        self._make_worker_and_agent(["fs.mkdir"], "w_mkdir2", "a_mkdir2")
+        task_path = Path(self.temp.name) / "mkdir2_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_mkdir2], workers: [w_mkdir2] }\ntask do_mkdir2 {\n  fs.mkdir "idempotent";\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        self.runtime.run_task("a_mkdir2", "do_mkdir2")
+        self.runtime.run_task("a_mkdir2", "do_mkdir2")  # second call must not raise
+        self.assertTrue((self.sandbox.workspace / "idempotent").is_dir())
+
+    def test_path_var_workspace_expands(self) -> None:
+        self._make_worker_and_agent(["fs.mkdir"], "w_pv", "a_pv")
+        task_path = Path(self.temp.name) / "pv_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_pv], workers: [w_pv] }\ntask do_pv {\n  fs.mkdir $WORKSPACE/pvdir;\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        self.runtime.run_task("a_pv", "do_pv")
+        self.assertTrue((self.sandbox.workspace / "pvdir").is_dir())
+
+    def test_path_var_sandbox_expands(self) -> None:
+        self._make_worker_and_agent(["fs.list"], "w_pvs", "a_pvs")
+        task_path = Path(self.temp.name) / "pvs_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_pvs], workers: [w_pvs] }\ntask do_pvs {\n  fs.list $SANDBOX;\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        result = self.runtime.run_task("a_pvs", "do_pvs")
+        self.assertEqual(result.status_code, 0)
+
+    def test_path_var_traversal_still_blocked(self) -> None:
+        self._make_worker_and_agent(["fs.mkdir"], "w_pvt", "a_pvt")
+        task_path = Path(self.temp.name) / "pvt_task.psy"
+        task_path.write_text(
+            '@access { agents: [a_pvt], workers: [w_pvt] }\ntask do_pvt {\n  fs.mkdir $WORKSPACE/../../escape;\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task_path)
+        from psyker.errors import SandboxError
+        with self.assertRaises(SandboxError):
+            self.runtime.run_task("a_pvt", "do_pvt")
+
+    def test_run_batch_executes_steps_in_order(self) -> None:
+        import os
+        self._make_worker_and_agent(["fs.mkdir", "fs.write"], "w_batch", "a_batch")
+        task1 = Path(self.temp.name) / "bt1.psy"
+        task1.write_text(
+            '@access { agents: [a_batch], workers: [w_batch] }\ntask step1 {\n  fs.mkdir "batch_out";\n}\n',
+            encoding="utf-8",
+        )
+        task2 = Path(self.temp.name) / "bt2.psy"
+        task2.write_text(
+            '@access { agents: [a_batch], workers: [w_batch] }\ntask step2 {\n  fs.write "batch_out/done.txt" "ok";\n}\n',
+            encoding="utf-8",
+        )
+        batch_file = Path(self.temp.name) / "mybatch.psy"
+        batch_file.write_text(
+            '@access { agents: [a_batch], workers: [w_batch] }\nbatch pipeline {\n  run step1;\n  run step2 after step1;\n}\n',
+            encoding="utf-8",
+        )
+        self.runtime.load_file(task1)
+        self.runtime.load_file(task2)
+        with patch.dict(os.environ, {"PSYKER_FEATURE_BATCH": "1"}):
+            self.runtime.load_file(batch_file)
+            results = self.runtime.run_batch("a_batch", "pipeline")
+        self.assertEqual(len(results), 2)
+        self.assertTrue((self.sandbox.workspace / "batch_out" / "done.txt").exists())
+
+    def test_run_batch_unknown_task_raises(self) -> None:
+        import os
+        self._make_worker_and_agent(["fs.mkdir"], "w_bu", "a_bu")
+        batch_file = Path(self.temp.name) / "bad_batch.psy"
+        batch_file.write_text(
+            '@access { agents: [a_bu], workers: [w_bu] }\nbatch bad {\n  run nonexistent;\n}\n',
+            encoding="utf-8",
+        )
+        from psyker.errors import ReferenceError
+        with patch.dict(os.environ, {"PSYKER_FEATURE_BATCH": "1"}):
+            self.runtime.load_file(batch_file)
+            with self.assertRaises(ReferenceError):
+                self.runtime.run_batch("a_bu", "bad")
+
     def test_runtime_exec_uses_hidden_windows_subprocess_when_available(self) -> None:
         if sys.platform != "win32":
             self.skipTest("Windows-specific subprocess behavior")
